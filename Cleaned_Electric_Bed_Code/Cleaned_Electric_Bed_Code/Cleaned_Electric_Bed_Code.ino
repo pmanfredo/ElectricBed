@@ -21,26 +21,26 @@ const int32_t rpmDifferenceThreshold = 1000; // Threshold for RPM difference
 int speedAdjustment = 0;                     // For adjusting speed difference between two sets of motors
 
 // ibus Channel Assignments
-#define RJoyX 1
-#define RJoyY 2
-#define LJoyY 3
-#define LJoyX 4
-#define LPot 5
-#define RPot 6
-#define SWA 7
-#define SWB 8
-#define SWC 9
-#define SWD 10
+#define RJoyX 0
+#define RJoyY 1
+#define LJoyY 2
+#define LJoyX 3
+#define LPot 4
+#define RPot 5
+#define SWA 6
+#define SWB 7
+#define SWC 8
+#define SWD 9
 
 // Setup function initializes the serial communication ports and prepares the system for operation.
 void setup()
 {
   Serial.begin(9600);    // Initializes the Serial port for logging to the Arduino IDE Serial Monitor.
-  Serial1.begin(115200); // Initializes Serial1 for communication with the first ESC.
-  Serial2.begin(115200); // Initializes Serial2 for communication with the second ESC.
+  //Serial1.begin(115200); // Initializes Serial1 for communication with the first ESC.
+  //Serial2.begin(115200); // Initializes Serial2 for communication with the second ESC.
   Serial3.begin(115200); // Initializes Serial3 for communication with the iBus receiver.
 
-  setupESCs();         // Calls the function to setup and initialize the ESCs.
+  //setupESCs();         // Calls the function to setup and initialize the ESCs.
   IBus.begin(Serial3); // Initializes the iBus communication on Serial3.
   waitForReceiver();   // Waits for the receiver to start sending signals before proceeding.
 }
@@ -48,15 +48,19 @@ void setup()
 // Main loop function checks for signal loss and processes control inputs if signal is present.
 void loop()
 {
-  checkSignalLoss(); // Checks if the signal has been lost and stops motors if so.
+  printChannelValues();
   if (IBus.cnt_rec != lastCntRec)
   {                            // Checks if new iBus messages have been received since the last loop iteration.
+    //Serial.println("Updating Telemetry");
     updateTelemetry();         // Updates telemetry data from the ESCs for features like battery monitoring.
+    //Serial.println("Adjusting");
     adjustForStraightDrive();  // Adjusts motor power to maintain straight driving based on RPM differences.
+    //Serial.println("Processing Inputs");
     processControlInputs();    // Reads control inputs from the receiver and adjusts motor speeds accordingly.
     lastCntRec = IBus.cnt_rec; // Updates the last iBus message count for the next loop iteration.
     lastSignalTime = millis(); // Updates the last signal time to the current time.
   }
+  //delay(2000);
 }
 
 // Function to initialize the ESCs (Electronic Speed Controllers) by setting their respective serial ports.
@@ -79,28 +83,10 @@ void waitForReceiver()
   Serial.println("Receiver connected."); // Log message indicating a connection to the receiver has been established
 }
 
-// Function to check for signal loss and stop the motors if the signal isn't received within the specified timeout.
-void checkSignalLoss()
-{
-  if (millis() - lastSignalTime > signalTimeout)
-  {               // Checks if the current time minus the last signal time exceeds the timeout
-    stopMotors(); // Calls the function to stop the motors due to signal loss
-    while (millis() - lastSignalTime > signalTimeout)
-    { // Continues to check for signal loss in a loop
-      if (IBus.cnt_rec != lastCntRec)
-      {                                     // If a new signal (message count change) is detected
-        lastCntRec = IBus.cnt_rec;          // Update the last received message count
-        lastSignalTime = millis();          // Update the last signal time to the current time
-        Serial.println("Signal regained."); // Log message indicating the signal has been regained
-        break;                              // Breaks out of the loop since signal has been regained
-      }
-    }
-  }
-}
-
 // Processes control inputs by reading inputs, making smooth adjustments, and then applying these adjustments to speed and turn.
 void processControlInputs()
 {
+  //Serial.println("Read the Inputs");
   readInputs();                         // Reads the control inputs from the receiver
   smoothAdjustments();                  // Applies smooth adjustments to speed and turn to avoid abrupt changes
   speedturn(currentSpeed, currentTurn); // Applies the adjusted speed and turn values to the motors
@@ -109,9 +95,11 @@ void processControlInputs()
 // Reads inputs from the remote control receiver and maps them to target speed and turn values.
 void readInputs()
 {
+  //Serial.println("Reading Left Joy Stick Y Axis");
   targetSpeed = IBus.readChannel(LJoyY); // Reads the speed input from Left Joystick Y Axis of the receiver
-  // Checks if the SWA input is above 1500 (typically the threshold for forward/reverse switch)
-  if (IBus.readChannel(SWA) > 1500)
+  //Serial.println(targetSpeed);
+  // Checks if the SWA input is above 1000 (typically the threshold for forward/reverse switch)
+  if (IBus.readChannel(SWA) > 1000)
   {
     // If true, maps the speed value for reverse direction
     targetSpeed = map(targetSpeed, 1050, 2000, 127, 0); // Maps reverse speed
@@ -123,6 +111,7 @@ void readInputs()
   }
   // Reads the turn input from Right Joystick X Axis and maps it to a target turn value
   targetTurn = (((int)IBus.readChannel(RJoyX) - 1500) * 4) / 10; // Maps turn value based on Right Joystick X Axis input
+  //Serial.println(targetTurn);
 }
 
 // Applies smooth adjustments to the current speed and turn values to reach the target values without abrupt changes.
@@ -175,24 +164,20 @@ void updateTelemetry()
   // Check if either battery voltage is below the threshold and warn if so
   if (batteryVoltage1 < voltageWarningThreshold || batteryVoltage2 < voltageWarningThreshold)
   {
-    Serial.println("Warning: Low Battery Voltage!"); // Print a low battery warning
+    //Serial.println("Warning: Low Battery Voltage!"); // Print a low battery warning
   }
 }
 
 // Adjusts the speed adjustment factor to help the vehicle drive straight by correcting for differences in motor RPM.
-void adjustForStraightDrive()
-{
-  int rpmDifference = motorRPM1 - motorRPM2; // Calculate the difference in RPM between the two motors
-  // If the RPM difference exceeds the threshold, calculate a speed adjustment to compensate
-  if (abs(rpmDifference) > rpmDifferenceThreshold)
-  {
-    speedAdjustment = rpmDifference / 100; // Determine adjustment factor based on RPM difference
-  }
-  else
-  {
-    speedAdjustment = 0; // Reset adjustment factor if RPM difference is within the threshold
+void adjustForStraightDrive() {
+  int rpmDifference = motorRPM1 - motorRPM2;
+  if (!targetTurn && abs(rpmDifference) > rpmDifferenceThreshold) {
+    speedAdjustment = rpmDifference / 100;
+  } else {
+    speedAdjustment = 0;
   }
 }
+
 
 // Stops the motors by setting their speed values to neutral, used in cases of signal loss or as part of a shutdown procedure.
 void stopMotors()
@@ -207,3 +192,41 @@ void stopMotors()
 
   Serial.println("Motors stopped due to signal loss."); // Log message indicating motors have been stopped
 }
+
+void printChannelValues(){
+  // Serial.print("Channel 0: ");
+  // Serial.println(IBus.readChannel(0));
+
+  // Serial.print("Channel 1: ");
+  // Serial.println(IBus.readChannel(1));
+  
+  // Serial.print("Channel 2: ");
+  // Serial.println(IBus.readChannel(2));
+  
+  // Serial.print("Channel 3: ");
+  // Serial.println(IBus.readChannel(3));
+  
+  // Serial.print("Channel 4: ");
+  // Serial.println(IBus.readChannel(4));
+  
+  // Serial.print("Channel 5: ");
+  // Serial.println(IBus.readChannel(5));
+  
+  // Serial.print("Channel 6: ");
+  // Serial.println(IBus.readChannel(6));
+  
+  // Serial.print("Channel 7: ");
+  // Serial.println(IBus.readChannel(7));
+  
+  // Serial.print("Channel 8: ");
+  // Serial.println(IBus.readChannel(8));
+  
+  // Serial.print("Channel 9: ");
+  // Serial.println(IBus.readChannel(9));
+
+  Serial.print("IBus Count: ");
+  Serial.println(IBus.cnt_rec);
+
+  Serial.println();
+}
+
