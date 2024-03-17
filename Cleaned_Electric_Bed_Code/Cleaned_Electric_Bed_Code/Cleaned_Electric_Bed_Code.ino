@@ -144,11 +144,11 @@ void speedturn(int speed, int angle)
 
   // Set the calculated speeds to the ESCs through the VESC UART interface
   UART1.nunchuck.valueY = leftSpeed;  // Apply left speed adjustment
-  UART2.nunchuck.valueY = rightSpeed; // Apply right speed adjustment
+  //UART2.nunchuck.valueY = rightSpeed; // Apply right speed adjustment
 
   // Send the updated values to the ESCs to control the motors
-  UART1.setNunchuckValues();
-  UART2.setNunchuckValues();
+  UART1.setNunchuckValues(38);
+  //UART2.setNunchuckValues();
 }
 
 // Updates telemetry data from the ESCs, including battery voltage and motor RPM, and checks for low battery voltage.
