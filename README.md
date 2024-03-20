@@ -2,6 +2,8 @@
 
 Welcome to the `ElectricBed` project! This comprehensive guide is designed to assist you in creating a low-speed, electrically powered vehicle, uniquely constructed as a queen-sized bed that can carry two people. It's remotely controlled, featuring advanced functionalities such as telemetry feedback, dynamic control systems, and LED lighting, all managed by an Arduino Mega 2560.
 
+**This project is an ongoing endeavor, with new features and enhancements being added and completed over time.**
+
 ## Overview
 
 The ElectricBed project transforms the concept of mobility and rest into a single, innovative design. Equipped with dual Electronic Speed Controllers (ESCs), input from a FlySky FS-i6X transmitter, LED lighting effects, and a motion sensor for enhanced driving stability, this project invites hobbyists and developers to explore the fusion of comfort and technology.
