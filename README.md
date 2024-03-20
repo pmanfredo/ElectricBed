@@ -1,34 +1,68 @@
-# ElectricBed
+# ElectricBed: Remote-Controlled Vehicle Project
 
-## Remote-Controlled Vehicle Control Program
+Welcome to the `ElectricBed` project! This is a comprehensive guide designed to help you get started with a remote-controlled vehicle equipped with advanced features like telemetry feedback, dynamic control systems, and LED lighting, all controlled by an Arduino Mega 2560.
 
-This program is designed to control a remote-controlled vehicle equipped with two Electronic Speed Controllers (ESCs), utilizing input from a FlySky FS-i6X remote control transmitter via the iBus protocol. It is intended for use with an Arduino Mega 2560, which communicates with the ESCs to control motor speed and direction, as well as processes telemetry data for features like battery monitoring and RPM-based adjustments for stability and traction control.
+## Overview
 
-### Features
+This project utilizes a remote-controlled vehicle framework that includes dual Electronic Speed Controllers (ESCs), input from a FlySky FS-i6X transmitter, LED lighting effects, and a motion sensor for enhanced driving dynamics. It's engineered for hobbyists and developers looking to dive deeper into the world of RC vehicles with custom-built electronics.
 
-- Smooth acceleration and deceleration to prevent sudden starts or stops.
-- Dynamic turning control that adjusts sensitivity based on current speed.
-- Telemetry feedback for low battery warning and RPM-based traction and stability adjustments.
-- Signal loss detection with automatic motor stop for safety.
+### Key Features
+
+- Dynamic speed and turn control for smooth handling.
+- Telemetry feedback for battery monitoring and RPM-based adjustments.
+- LED lighting control for visual effects.
+- Motion detection for stability and traction control.
+- Safety features including an emergency stop.
+
+### Required Hardware
+
+- Arduino Mega 2560
+- Two Electronic Speed Controllers (ESCs)
+- FlySky FS-i6X remote control transmitter and receiver
+- Adafruit NeoPixel LED Strip
+- MPU6050 Accelerometer and Gyro Sensor
+- Relay module(s) for additional control circuits
+- Power sources for the Arduino, ESCs, and LEDs
 
 ### Wiring Instructions
 
-1. **ESC Connections:**  
-   ESC 1 and ESC 2 should be connected to the Arduino Mega 2560's Serial1 (pins 18 (TX1) and 19 (RX1)) and Serial2 (pins 16 (TX2) and 17 (RX2)) ports respectively. This allows for UART communication with each ESC to control motor speeds.
+1. **ESC Connections**: Connect ESC 1 and ESC 2 to the Arduino's `Serial1` and `Serial2` ports respectively (TX1/RX1 for ESC 1 and TX2/RX2 for ESC 2), enabling UART communication for motor control.
 
-2. **iBus Receiver:**  
-   The FlySky iBus receiver should be connected to Serial3 (pins 14 (TX3) and 15 (RX3)) of the Arduino Mega 2560. This setup is crucial for reading the control signals sent from the FlySky remote control transmitter.
+2. **iBus Receiver**: Link the iBus receiver to `Serial3` (TX3/RX3) on the Arduino to read signals from the FlySky transmitter.
 
-3. **Power Supply:**  
-   Ensure the Arduino Mega 2560 is powered adequately, either via USB or an external power source suitable for its voltage requirements. The ESCs and motors should be powered according to their specifications, typically through a separate battery to handle the higher current demands.
+3. **LED Strip**: Attach the Adafruit NeoPixel LED strip to pin `6` on the Arduino for lighting control.
 
-4. **Additional Components:**  
-   Depending on the ESCs' telemetry capabilities, additional wiring may be required to enable feedback from the ESCs to the Arduino for processing.
+4. **MPU6050 Sensor**: Connect the MPU6050 accelerometer and gyro sensor via the Arduino's I2C ports (SDA and SCL).
 
-### Usage Notes
+5. **Relay Modules**: Interface the relay modules with digital pins `2` through `9` as needed for additional actuation or control features.
 
-- The program is set up to work out of the box with the specified hardware and wiring. It is important to ensure that the iBus receiver and ESCs are correctly bound and configured with the FlySky transmitter before operation.
-- The vehicle's behavior (speed, acceleration rates, turning sensitivity) can be adjusted within the code to suit different terrains or driving conditions.
-- Safety should be a priority; ensure all connections are secure and the vehicle is in a safe area for operation during testing and use.
+6. **Power Connections**: Ensure the Arduino and all peripherals are powered appropriately, considering their voltage and current requirements.
 
-This program provides a foundational framework for remote-controlled vehicle operation, with potential for further customization and development to include additional features such as GPS navigation, obstacle avoidance, and more advanced telemetry-based controls.
+### Program Overview
+
+The codebase is structured around several key functions, each responsible for a specific aspect of vehicle control:
+
+- `setup()`: Initializes the serial ports, ESCs, iBus receiver, relays, LED strip, and I2C devices.
+- `loop()`: Main execution loop handling signal processing, control input reading, telemetry updates, and safety checks.
+- Control input processing for speed, turning, and auxiliary functions like lighting or auxiliary circuits.
+- Telemetry data handling for real-time feedback on battery voltage and motor RPM.
+- Utility functions for relay control, LED color setting, and motion detection.
+
+#### Control Modes
+
+The vehicle supports different control modes (RPM, Duty, Current) selectable through the `controlMode` variable, allowing you to tailor the driving experience to the conditions or preferences.
+
+#### Safety Features
+
+Safety is paramount; the program includes a system for ensuring all switches are off before operation can commence and a 2 step kill switch to prevent unwanted actions.
+
+### Getting Started
+
+1. Assemble the hardware according to the wiring instructions.
+2. Upload the provided program to your Arduino Mega 2560.
+3. Bind and configure your FlySky FS-i6X transmitter with the receiver.
+4. Power on the system and perform initial testing in a safe, controlled environment.
+
+### Customization
+
+The program is designed for easy customization. You can adjust parameters such as acceleration rates, turn sensitivity, and LED behavior to suit your needs. Explore modifying the code to add new features or integrate additional sensors for even more interactive and responsive control.
