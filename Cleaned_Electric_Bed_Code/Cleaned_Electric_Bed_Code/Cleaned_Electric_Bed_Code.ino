@@ -1,6 +1,11 @@
 #include <IBusBM.h>
 #include <VescUart.h>
 #include <Adafruit_NeoPixel.h>
+#include "I2Cdev.h"
+#include "MPU6050.h"
+#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+    #include "Wire.h"
+#endif
 
 VescUart UART1; // VescUart object for commanding the ESC's
 VescUart UART2; // VescUart object for commanding the ESC's
@@ -60,48 +65,32 @@ const int relay8 = 9;
 // Create an Adafruit_NeoPixel object
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
+MPU6050 accelgyro;
+const int quickTurnThreshold = 100; // Example threshold, adjust based on testing
+
 // Setup function initializes the serial communication ports and prepares the system for operation.
-void setup()
-{
-  Serial.begin(9600);    // Initializes the Serial port for logging to the Arduino IDE Serial Monitor.
-  Serial1.begin(115200); // Initializes Serial1 for communication with the first ESC.
-  Serial2.begin(115200); // Initializes Serial2 for communication with the second ESC.
-  Serial3.begin(115200); // Initializes Serial3 for communication with the iBus receiver.
-
-  setupESCs();         // Calls the function to setup and initialize the ESCs.
-  IBus.begin(Serial3); // Initializes the iBus communication on Serial3.
-  waitForReceiver();   // Waits for the receiver to start sending signals before proceeding.
-
-  pinMode(relay1, OUTPUT);
-  pinMode(relay2, OUTPUT);
-  pinMode(relay3, OUTPUT);
-  pinMode(relay4, OUTPUT);
-  pinMode(relay5, OUTPUT);
-  pinMode(relay6, OUTPUT);
-  pinMode(relay7, OUTPUT);
-  pinMode(relay8, OUTPUT);
-
-  // Initialize all relays to OFF position (assuming HIGH means OFF)
-  for (int i = relay1; i <= relay8; i++) {
-    digitalWrite(i, HIGH);
-  }
-
-  strip.begin();           // This initializes the NeoPixel library.
-  strip.show();            // Initialize all pixels to 'off'
+void setup() {
+    initializeSerial();
+    setupESCs();
+    IBus.begin(Serial3);
+    waitForReceiver();
+    initializeRelays();
+    initializeLEDStrip();
+    initializeI2CDevices();
 }
 
 // Main loop function checks for signal loss and processes control inputs if signal is present.
 void loop()
 {
   serialInput();
-  //printChannelValues();
-  //if (IBus.cnt_rec != lastCntRec)
-  //{                            // Checks if new iBus messages have been received since the last loop iteration.
+  printChannelValues();
+  if (IBus.cnt_rec != lastCntRec)
+  {                            // Checks if new iBus messages have been received since the last loop iteration.
     updateTelemetry();         // Updates telemetry data from the ESCs for features like battery monitoring.
     processControlInputs();    // Reads control inputs from the receiver and adjusts motor speeds accordingly.
-    //lastCntRec = IBus.cnt_rec; // Updates the last iBus message count for the next loop iteration.
-    //lastSignalTime = millis(); // Updates the last signal time to the current time.
-  //}
+    lastCntRec = IBus.cnt_rec; // Updates the last iBus message count for the next loop iteration.
+    lastSignalTime = millis(); // Updates the last signal time to the current time.
+  }
   //delay(2000);
 }
 
@@ -123,6 +112,33 @@ void waitForReceiver()
   lastCntRec = IBus.cnt_rec;             // Stores the count of received messages for later comparison
   lastSignalTime = millis();             // Stores the current time as the last time a signal was received
   Serial.println("Receiver connected."); // Log message indicating a connection to the receiver has been established
+}
+
+void initializeSerial() {
+    Serial.begin(9600);
+    Serial1.begin(115200);
+    Serial2.begin(115200);
+    Serial3.begin(115200);
+}
+
+void initializeRelays() {
+    const int relays[] = {relay1, relay2, relay3, relay4, relay5, relay6, relay7, relay8};
+    for (int relay : relays) {
+        pinMode(relay, OUTPUT);
+        digitalWrite(relay, HIGH); // Assuming HIGH means OFF
+    }
+}
+
+void initializeLEDStrip() {
+    strip.begin();
+    strip.show(); // Initialize all pixels to 'off'
+}
+
+void initializeI2CDevices() {
+    Wire.begin();
+    Serial.println("Initializing I2C devices...");
+    accelgyro.initialize();
+    Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
 }
 
 void processControlInputs() {
@@ -253,6 +269,8 @@ void readInputs()
 // Applies smooth adjustments to the current speed and turn values to reach the target values without abrupt changes.
 void smoothAdjustments()
 {
+  checkAndAdjustForQuickTurns();
+
   // Adjusts the current speed towards the target speed at a controlled rate (accelRate)
   if (currentSpeed < targetSpeed)
     currentSpeed += min(accelRate, targetSpeed - currentSpeed); // Increases speed if below target
@@ -264,6 +282,23 @@ void smoothAdjustments()
     currentTurn += min(turnRate, targetTurn - currentTurn); // Increases turn rate if below target
   else if (currentTurn > targetTurn)
     currentTurn -= min(turnRate, currentTurn - targetTurn); // Decreases turn rate if above target
+}
+
+void checkAndAdjustForQuickTurns() {
+    int16_t ax, ay, az;
+    int16_t gx, gy, gz;
+    accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+
+    // Assuming gz (rotation around the Z-axis) is your turning axis
+    // The sensitivity scale factor for the gyroscope is 131 LSB/degrees/sec
+    // according to the MPU-6050 datasheet when using the default sensitivity setting.
+    float turnRate = gz / 131.0;
+
+    if (abs(turnRate) > quickTurnThreshold) {
+        // Quick turn detected, reduce target speed
+        Serial.println("Quick turn detected, reducing speed.");
+        targetSpeed = targetSpeed / 2; // Example reduction, adjust as needed
+    }
 }
 
 void applyControlRPM(int rpm) {
@@ -421,4 +456,3 @@ void printChannelValues(){
 
   Serial.println();
 }
-
