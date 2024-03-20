@@ -1,5 +1,6 @@
 #include <IBusBM.h>
 #include <VescUart.h>
+#include <Adafruit_NeoPixel.h>
 
 VescUart UART1; // VescUart object for commanding the ESC's
 VescUart UART2; // VescUart object for commanding the ESC's
@@ -39,6 +40,25 @@ ControlMode controlMode = MODE_RPM; // Choose control mode: MODE_RPM, MODE_DUTY,
 #define ON 2000
 #define OFF 1000
 
+// Define relay channels to Arduino pin numbers
+const int relay1 = 2;
+const int relay2 = 3;
+const int relay3 = 4;
+const int relay4 = 5;
+const int relay5 = 6;
+const int relay6 = 7;
+const int relay7 = 8;
+const int relay8 = 9;
+
+// Define the pin that the LED strip is connected to
+#define LED_PIN 6
+
+// Define the number of LEDs in the strip
+#define LED_COUNT 300
+
+// Create an Adafruit_NeoPixel object
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+
 // Setup function initializes the serial communication ports and prepares the system for operation.
 void setup()
 {
@@ -50,6 +70,23 @@ void setup()
   setupESCs();         // Calls the function to setup and initialize the ESCs.
   IBus.begin(Serial3); // Initializes the iBus communication on Serial3.
   waitForReceiver();   // Waits for the receiver to start sending signals before proceeding.
+
+  pinMode(relay1, OUTPUT);
+  pinMode(relay2, OUTPUT);
+  pinMode(relay3, OUTPUT);
+  pinMode(relay4, OUTPUT);
+  pinMode(relay5, OUTPUT);
+  pinMode(relay6, OUTPUT);
+  pinMode(relay7, OUTPUT);
+  pinMode(relay8, OUTPUT);
+
+  // Initialize all relays to OFF position (assuming HIGH means OFF)
+  for (int i = relay1; i <= relay8; i++) {
+    digitalWrite(i, HIGH);
+  }
+
+  strip.begin();           // This initializes the NeoPixel library.
+  strip.show();            // Initialize all pixels to 'off'
 }
 
 // Main loop function checks for signal loss and processes control inputs if signal is present.
@@ -94,7 +131,7 @@ void processControlInputs() {
   smoothAdjustments();
   
   // Turn system OFF or set current to 0 if input is 1000
-  if (targetSpeed <= 1000) {
+  if (targetSpeed <= OFF) {
       UART1.setCurrent(0);
       UART1.setCurrent(0,101);
       UART2.setCurrent(0);
@@ -236,6 +273,7 @@ void applyControlDuty(float dutyCycle) {
   int leftDutyCycle = constrain(dutyCycle + (0.05 * currentTurn), 0, 80);
   int rightDutyCycle = constrain(dutyCycle - (0.05 * currentTurn), 0, 80);
   UART1.setDuty(leftDutyCycle);
+
   UART2.setDuty(leftDutyCycle);
   UART1.setDuty(rightDutyCycle, 101);
   UART2.setDuty(rightDutyCycle, 101);
@@ -281,7 +319,6 @@ void updateTelemetry()
   }
 }
 
-
 // Stops the motors by setting their speed values to neutral, used in cases of signal loss or as part of a shutdown procedure.
 void stopMotors()
 {
@@ -317,6 +354,26 @@ if (Serial.available() > 0) {
 
 
   }
+}
+
+void turnOnRelay(int relayPin) {
+  digitalWrite(relayPin, LOW); // Turn relay on
+}
+
+void turnOffRelay(int relayPin) {
+  digitalWrite(relayPin, HIGH); // Turn relay off
+}
+
+void setPixelColor(int pixel, uint8_t red, uint8_t green, uint8_t blue) {
+  strip.setPixelColor(pixel, strip.Color(red, green, blue));
+  strip.show();
+}
+
+void fillStrip(uint8_t red, uint8_t green, uint8_t blue) {
+  for(int i = 0; i < LED_COUNT; i++) {
+    strip.setPixelColor(i, strip.Color(red, green, blue));
+  }
+  strip.show();
 }
 
 void printChannelValues(){
