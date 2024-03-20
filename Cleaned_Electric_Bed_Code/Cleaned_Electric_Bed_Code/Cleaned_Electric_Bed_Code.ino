@@ -22,6 +22,9 @@ int speedAdjustment = 0;                     // For adjusting speed difference b
 
 bool movementEnabled = true; // Global variable to track movement enable state
 
+enum ControlMode { MODE_RPM, MODE_DUTY, MODE_CURRENT };
+ControlMode controlMode = MODE_RPM; // Choose control mode: MODE_RPM, MODE_DUTY, or MODE_CURRENT
+
 // ibus Channel Assignments
 #define RJoyX 0
 #define RJoyY 1
@@ -123,34 +126,60 @@ void processControlInputs() {
 // Reads inputs from the remote control receiver and maps them to target speed and turn values.
 void readInputs()
 {
-  // Continuously check the kill switch state
+    // Step 1: Ensure all switches are OFF before proceeding
+  while (true) {
+    int swaState = IBus.readChannel(SWA);
+    int swbState = IBus.readChannel(SWB);
+    int swcState = IBus.readChannel(SWC);
+    int swdState = IBus.readChannel(SWD);
+
+    if (swaState == OFF && swbState == OFF && swcState == OFF && swdState == OFF) {
+      break; // Exit the loop if all switches are OFF
+    }
+
+    Serial.println("Ensure all switches are OFF to proceed.");
+    delay(500); // Delay to prevent flooding the serial output
+  }
+
+  // Step 2: Proceed with kill switch logic, incorporating the SWB safety feature
+  static bool swbSafetyCheckPassed = false; // Static variable to track if the SWB safety check has passed
+
   while (true)
   {
-    // Read the state of the SWA switch, now referred to as killState
     int killState = IBus.readChannel(SWA);
     
-    // Check if killState is OFF
-    if (killState == OFF)
-    {
-      if (!movementEnabled) { // Check if we've already processed the kill signal
-        delay(100); // Brief delay to prevent flooding the serial output
-        continue; // Stay in the loop waiting for the switch to be turned back ON
-      }
-
-      stopMotors();            // Stop all motors
-      movementEnabled = false; // Disable further movement
-      currentSpeed = 0;        // Set current speed to 0
-      Serial.println("Movement Disabled. Kill switch is OFF.");
-      // No return statement here; we now loop until the condition changes
+    // Reset SWB safety check if kill switch is turned OFF
+    if (killState == OFF) {
+      swbSafetyCheckPassed = false;
+      stopMotors();
+      movementEnabled = false;
+      currentSpeed = 0;
+      Serial.println("Movement Disabled. Kill switch is OFF. SWB safety check reset.");
     }
-    else
-    {
+
+    // Conduct SWB safety check only if it hasn't been passed yet
+    if (!swbSafetyCheckPassed) {
+      int swbState = IBus.readChannel(SWB);
+      if (killState == ON && swbState == ON) {
+        swbSafetyCheckPassed = true;
+        Serial.println("SWB safety check passed. System starting in forward.");
+      } else {
+        Serial.println("Waiting for SWB to be turned ON for safety check.");
+        delay(500); // Delay to prevent flooding the serial output
+        continue; // Remain in loop until SWB is ON and kill switch is ON
+      }
+    }
+
+    // Exit loop and allow system to proceed if killState is ON and SWB safety check has been passed
+    if (killState == ON && swbSafetyCheckPassed) {
       if (!movementEnabled) {
-        movementEnabled = true;  // Re-enable movement upon kill switch turning ON
+        movementEnabled = true;
         Serial.println("Movement Enabled. Kill switch is ON.");
       }
-      break; // Exit the loop if killState is ON
+      break; // Exit the loop if conditions are met
     }
+    
+    delay(100); // Brief delay to reduce CPU load during loop
   }
 
   targetSpeed = IBus.readChannel(LJoyY); // Reads the speed input from Left Joystick Y Axis of the receiver
@@ -193,8 +222,8 @@ void smoothAdjustments()
 
 void applyControlRPM(int rpm) {
   // Calculate left and right motor RPM based on target turn and speed adjustments
-  int leftRPM = constrain(rpm + (2 * currentTurn), 0, 7000)
-  int rightRPM = constrain(rpm - (2 * currentTurn), 0, 7000)
+  int leftRPM = constrain(rpm + (2 * currentTurn), 0, 7000);
+  int rightRPM = constrain(rpm - (2 * currentTurn), 0, 7000);
   UART1.setRPM(leftRPM);
   UART2.setRPM(leftRPM);
   UART1.setRPM(rightRPM,101);
@@ -204,8 +233,8 @@ void applyControlRPM(int rpm) {
 
 void applyControlDuty(float dutyCycle) {
   // Apply duty cycle control to motors
-  int leftDutyCycle = constrain(dutyCycle + (0.05 * currentTurn), 0, 80)
-  int rightDutyCycle = constrain(rpm - (0.05 * currentTurn), 0, 80)
+  int leftDutyCycle = constrain(dutyCycle + (0.05 * currentTurn), 0, 80);
+  int rightDutyCycle = constrain(dutyCycle - (0.05 * currentTurn), 0, 80);
   UART1.setDuty(leftDutyCycle);
   UART2.setDuty(leftDutyCycle);
   UART1.setDuty(rightDutyCycle, 101);
@@ -215,8 +244,8 @@ void applyControlDuty(float dutyCycle) {
 
 void applyControlCurrent(float current) {
   // Apply current control to motors, adjustments for turning not demonstrated
-  int leftCurrent = constrain(dutyCycle + (0.025 * currentTurn), 0, 40)
-  int rightCurrent = constrain(rpm - (0.025 * currentTurn), 0, 40)
+  int leftCurrent = constrain(current + (0.025 * currentTurn), 0, 40);
+  int rightCurrent = constrain(current - (0.025 * currentTurn), 0, 40);
   UART1.setCurrent(leftCurrent);
   UART2.setCurrent(leftCurrent);
   UART1.setCurrent(rightCurrent,101);
