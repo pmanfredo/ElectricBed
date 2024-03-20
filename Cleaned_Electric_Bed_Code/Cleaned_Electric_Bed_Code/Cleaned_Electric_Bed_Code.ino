@@ -39,6 +39,7 @@ ControlMode controlMode = MODE_RPM; // Choose control mode: MODE_RPM, MODE_DUTY,
 #define SWD 9
 #define ON 2000
 #define OFF 1000
+#define MID 1500
 
 // Define relay channels to Arduino pin numbers
 const int relay1 = 2;
@@ -217,6 +218,14 @@ void readInputs()
     }
     
     delay(100); // Brief delay to reduce CPU load during loop
+  }
+
+  int swdState = IBus.readChannel(SWD); // Read the SWD channel state
+
+  if (swdState >= ON) { // Assuming 2000 or above is considered ON
+      turnOnRelay(relay1); // Turn ON relay1
+  } else if (swdState <= OFF) { // Assuming 1000 or below is considered OFF
+      turnOffRelay(relay1); // Turn OFF relay1
   }
 
   targetSpeed = IBus.readChannel(LJoyY); // Reads the speed input from Left Joystick Y Axis of the receiver
