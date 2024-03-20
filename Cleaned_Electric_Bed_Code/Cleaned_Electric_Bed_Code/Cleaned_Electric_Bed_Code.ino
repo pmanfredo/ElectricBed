@@ -20,6 +20,8 @@ const float voltageWarningThreshold = 33.0;  // Threshold for 10S battery
 const int32_t rpmDifferenceThreshold = 1000; // Threshold for RPM difference
 int speedAdjustment = 0;                     // For adjusting speed difference between two sets of motors
 
+bool movementEnabled = true; // Global variable to track movement enable state
+
 // ibus Channel Assignments
 #define RJoyX 0
 #define RJoyY 1
@@ -121,6 +123,36 @@ void processControlInputs() {
 // Reads inputs from the remote control receiver and maps them to target speed and turn values.
 void readInputs()
 {
+  // Continuously check the kill switch state
+  while (true)
+  {
+    // Read the state of the SWA switch, now referred to as killState
+    int killState = IBus.readChannel(SWA);
+    
+    // Check if killState is OFF
+    if (killState == OFF)
+    {
+      if (!movementEnabled) { // Check if we've already processed the kill signal
+        delay(100); // Brief delay to prevent flooding the serial output
+        continue; // Stay in the loop waiting for the switch to be turned back ON
+      }
+
+      stopMotors();            // Stop all motors
+      movementEnabled = false; // Disable further movement
+      currentSpeed = 0;        // Set current speed to 0
+      Serial.println("Movement Disabled. Kill switch is OFF.");
+      // No return statement here; we now loop until the condition changes
+    }
+    else
+    {
+      if (!movementEnabled) {
+        movementEnabled = true;  // Re-enable movement upon kill switch turning ON
+        Serial.println("Movement Enabled. Kill switch is ON.");
+      }
+      break; // Exit the loop if killState is ON
+    }
+  }
+
   targetSpeed = IBus.readChannel(LJoyY); // Reads the speed input from Left Joystick Y Axis of the receiver
 
   // Checks if the SWA input is above 1000 (typically the threshold for forward/reverse switch)
