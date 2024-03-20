@@ -10,8 +10,8 @@ const unsigned long signalTimeout = 1000; // Signal timeout in milliseconds
 uint16_t lastCntRec = 0;                  // Last received count for detecting signal loss
 
 // Control variables
-int currentSpeed = 127, targetSpeed = 127, currentTurn = 0, targetTurn = 0;
-int accelRate = 5, turnRate = 5; // Rate of change for speed and turn
+int currentSpeed = 0, targetSpeed = 0, currentTurn = 0, targetTurn = 0;
+int accelRate = 100, turnRate = 5; // Rate of change for speed and turn
 
 // Telemetry variables
 float batteryVoltage1 = 0.0, batteryVoltage2 = 0.0;
@@ -37,30 +37,31 @@ void setup()
 {
   Serial.begin(9600);    // Initializes the Serial port for logging to the Arduino IDE Serial Monitor.
   Serial1.begin(115200); // Initializes Serial1 for communication with the first ESC.
-  //Serial2.begin(115200); // Initializes Serial2 for communication with the second ESC.
+  Serial2.begin(115200); // Initializes Serial2 for communication with the second ESC.
   Serial3.begin(115200); // Initializes Serial3 for communication with the iBus receiver.
 
   setupESCs();         // Calls the function to setup and initialize the ESCs.
-  IBus.begin(Serial3); // Initializes the iBus communication on Serial3.
-  waitForReceiver();   // Waits for the receiver to start sending signals before proceeding.
+  //IBus.begin(Serial3); // Initializes the iBus communication on Serial3.
+  //waitForReceiver();   // Waits for the receiver to start sending signals before proceeding.
 }
 
 // Main loop function checks for signal loss and processes control inputs if signal is present.
 void loop()
 {
+  serialInput();
   //printChannelValues();
-  if (IBus.cnt_rec != lastCntRec)
-  {                            // Checks if new iBus messages have been received since the last loop iteration.
+  //if (IBus.cnt_rec != lastCntRec)
+  //{                            // Checks if new iBus messages have been received since the last loop iteration.
     //Serial.println("Updating Telemetry");
     updateTelemetry();         // Updates telemetry data from the ESCs for features like battery monitoring.
     //Serial.println("Adjusting");
     //adjustForStraightDrive();  // Adjusts motor power to maintain straight driving based on RPM differences.
     //Serial.println("Processing Inputs");
     processControlInputs();    // Reads control inputs from the receiver and adjusts motor speeds accordingly.
-    lastCntRec = IBus.cnt_rec; // Updates the last iBus message count for the next loop iteration.
-    lastSignalTime = millis(); // Updates the last signal time to the current time.
-  }
-  delay(2000);
+    //lastCntRec = IBus.cnt_rec; // Updates the last iBus message count for the next loop iteration.
+    //lastSignalTime = millis(); // Updates the last signal time to the current time.
+  //}
+  //delay(2000);
 }
 
 // Function to initialize the ESCs (Electronic Speed Controllers) by setting their respective serial ports.
@@ -68,7 +69,7 @@ void setupESCs()
 {
   Serial.println("Initializing ESCs..."); // Log message indicating the start of ESC initialization
   UART1.setSerialPort(&Serial1);          // Assigns Serial1 to UART1, linking the ESC to the first serial port
-  //UART2.setSerialPort(&Serial2);          // Assigns Serial2 to UART2, linking the second ESC to another serial port
+  UART2.setSerialPort(&Serial2);          // Assigns Serial2 to UART2, linking the second ESC to another serial port
   Serial.println("ESCs Initialized.");    // Log message indicating the ESCs have been successfully initialized
 }
 
@@ -87,7 +88,7 @@ void waitForReceiver()
 void processControlInputs()
 {
   //Serial.println("Read the Inputs");
-  readInputs();                         // Reads the control inputs from the receiver
+  //readInputs();                         // Reads the control inputs from the receiver
   smoothAdjustments();                  // Applies smooth adjustments to speed and turn to avoid abrupt changes
   speedturn(currentSpeed, currentTurn); // Applies the adjusted speed and turn values to the motors
 }
@@ -147,8 +148,13 @@ void speedturn(int speed, int angle)
   //UART2.nunchuck.valueY = rightSpeed; // Apply right speed adjustment
 
   // Send the updated values to the ESCs to control the motors
-  UART1.setNunchuckValues(38);
+  //UART1.setNunchuckValues();
   //UART2.setNunchuckValues();
+
+  Serial.print("Setting RPM to ");
+  Serial.println(speed);
+  UART1.setRPM(speed,0);
+  UART1.setRPM(speed,101);
 }
 
 // Updates telemetry data from the ESCs, including battery voltage and motor RPM, and checks for low battery voltage.
@@ -160,12 +166,16 @@ void updateTelemetry()
     batteryVoltage1 = UART1.data.inpVoltage; // Store battery voltage from ESC 1
     motorRPM1 = UART1.data.rpm;              // Store motor RPM from ESC 1
 
-    //Serial.print(batteryVoltage1);
+    // Serial.print("Battery Voltage: ");
+    // Serial.println(batteryVoltage1);
   }
   if (UART2.getVescValues())
   {
     batteryVoltage2 = UART2.data.inpVoltage; // Store battery voltage from ESC 2
     motorRPM2 = UART2.data.rpm;              // Store motor RPM from ESC 2
+
+    // Serial.print("Battery Voltage: ");
+    // Serial.println(batteryVoltage2);
   }
 
   // Check if either battery voltage is below the threshold and warn if so
@@ -198,6 +208,29 @@ void stopMotors()
   UART2.setNunchuckValues();
 
   Serial.println("Motors stopped due to signal loss."); // Log message indicating motors have been stopped
+}
+
+void serialInput(){
+if (Serial.available() > 0) {
+    // Read the incoming data as a string until newline is encountered
+    String dataString = Serial.readStringUntil('\n');
+    // Convert the string to an integer
+    int incomingInt = dataString.toInt();
+    if (incomingInt == -1) {
+      currentSpeed = 0;
+      targetSpeed = 0;
+      UART1.setBrakeCurrent(5);
+      UART1.setCurrent(0,0);
+      UART1.setCurrent(0,101);
+      Serial.println("Braking!");
+    }else{
+      targetSpeed = incomingInt;
+      Serial.print("Received targetSpeed: ");
+      Serial.println(targetSpeed);
+    }
+
+
+  }
 }
 
 void printChannelValues(){
