@@ -31,6 +31,8 @@ int speedAdjustment = 0;                     // For adjusting speed difference b
 #define SWB 7
 #define SWC 8
 #define SWD 9
+#define ON 2000
+#define OFF 1000
 
 // Setup function initializes the serial communication ports and prepares the system for operation.
 void setup()
@@ -41,8 +43,8 @@ void setup()
   Serial3.begin(115200); // Initializes Serial3 for communication with the iBus receiver.
 
   setupESCs();         // Calls the function to setup and initialize the ESCs.
-  //IBus.begin(Serial3); // Initializes the iBus communication on Serial3.
-  //waitForReceiver();   // Waits for the receiver to start sending signals before proceeding.
+  IBus.begin(Serial3); // Initializes the iBus communication on Serial3.
+  waitForReceiver();   // Waits for the receiver to start sending signals before proceeding.
 }
 
 // Main loop function checks for signal loss and processes control inputs if signal is present.
@@ -52,11 +54,7 @@ void loop()
   //printChannelValues();
   //if (IBus.cnt_rec != lastCntRec)
   //{                            // Checks if new iBus messages have been received since the last loop iteration.
-    //Serial.println("Updating Telemetry");
     updateTelemetry();         // Updates telemetry data from the ESCs for features like battery monitoring.
-    //Serial.println("Adjusting");
-    //adjustForStraightDrive();  // Adjusts motor power to maintain straight driving based on RPM differences.
-    //Serial.println("Processing Inputs");
     processControlInputs();    // Reads control inputs from the receiver and adjusts motor speeds accordingly.
     //lastCntRec = IBus.cnt_rec; // Updates the last iBus message count for the next loop iteration.
     //lastSignalTime = millis(); // Updates the last signal time to the current time.
@@ -84,38 +82,63 @@ void waitForReceiver()
   Serial.println("Receiver connected."); // Log message indicating a connection to the receiver has been established
 }
 
-// Processes control inputs by reading inputs, making smooth adjustments, and then applying these adjustments to speed and turn.
-void processControlInputs()
-{
-  //Serial.println("Read the Inputs");
-  //readInputs();                         // Reads the control inputs from the receiver
-  smoothAdjustments();                  // Applies smooth adjustments to speed and turn to avoid abrupt changes
-  speedturn(currentSpeed, currentTurn); // Applies the adjusted speed and turn values to the motors
+void processControlInputs() {
+  readInputs();
+
+  // Applies smooth adjustments to speed and turn to avoid abrupt changes
+  smoothAdjustments();
+  
+  // Turn system OFF or set current to 0 if input is 1000
+  if (targetSpeed <= 1000) {
+      UART1.setCurrent(0);
+      UART1.setCurrent(0,101);
+      UART2.setCurrent(0);
+      UART2.setCurrent(0,101);
+      Serial.println("System turned off - Current set to 0.");
+      return;
+  }
+
+  // Depending on the control mode, map targetSpeed to the respective range and apply control
+  switch (controlMode) {
+      case MODE_RPM:
+          // Map targetSpeed (1001-2000) to RPM range (0-7000), considering 1000 as OFF
+          int rpmValue = map(currentSpeed, 1001, 2000, 0, 7000);
+          applyControlRPM(rpmValue);
+          break;
+      case MODE_DUTY:
+          // Map targetSpeed (1001-2000) to duty cycle range (0-80%)
+          float dutyCycle = map(targetSpeed, 1001, 2000, 0, 80) / 100.0;
+          applyControlDuty(dutyCycle);
+          break;
+      case MODE_CURRENT:
+          // Map targetSpeed (1001-2000) to current range (0-40A)
+          float current = map(targetSpeed, 1001, 2000, 0, 40);
+          applyControlCurrent(current);
+          break;
+  }
 }
 
 // Reads inputs from the remote control receiver and maps them to target speed and turn values.
 void readInputs()
 {
-  //Serial.println("Reading Left Joy Stick Y Axis");
   targetSpeed = IBus.readChannel(LJoyY); // Reads the speed input from Left Joystick Y Axis of the receiver
-  //Serial.println(targetSpeed);
+
   // Checks if the SWA input is above 1000 (typically the threshold for forward/reverse switch)
-  if (IBus.readChannel(SWA) > 1000)
+  if (IBus.readChannel(SWB) == OFF)
   {
     // If true, maps the speed value for reverse direction
-    targetSpeed = map(targetSpeed, 1000, 2000, 127, 0); // Maps reverse speed
+    targetSpeed = -targetSpeed;
     Serial.print("Reverse Target Speed: ");
     Serial.println(targetSpeed);
   }
   else
   {
-    // Otherwise, maps the speed value for forward direction
-    targetSpeed = map(targetSpeed, 1000, 2000, 127, 255); // Maps forward speed
     Serial.print("Target Speed: ");
     Serial.println(targetSpeed);
   }
+
   // Reads the turn input from Right Joystick X Axis and maps it to a target turn value
-  targetTurn = (((int)IBus.readChannel(RJoyX) - 1500) * 4) / 10; // Maps turn value based on Right Joystick X Axis input
+  targetTurn = (int)(IBus.readChannel(RJoyX) -1500); // 1000 (left) to 2000 (right), 1500 is neutral, turn -500 to 500
   Serial.print("Target Turn: ");
   Serial.println(targetTurn);
 }
@@ -136,25 +159,37 @@ void smoothAdjustments()
     currentTurn -= min(turnRate, currentTurn - targetTurn); // Decreases turn rate if above target
 }
 
-// Adjusts and applies the calculated speed and angle to the motors for movement and turning.
-void speedturn(int speed, int angle)
-{
-  // Calculate the adjusted speed for each side, incorporating the angle for turning and any speed adjustments for straight driving.
-  int leftSpeed = constrain(speed + angle - speedAdjustment, 0, 255);  // Adjust left motor speed
-  int rightSpeed = constrain(speed - angle + speedAdjustment, 0, 255); // Adjust right motor speed
+void applyControlRPM(int rpm) {
+  // Calculate left and right motor RPM based on target turn and speed adjustments
+  int leftRPM = constrain(rpm + (2 * currentTurn), 0, 7000)
+  int rightRPM = constrain(rpm - (2 * currentTurn), 0, 7000)
+  UART1.setRPM(leftRPM);
+  UART2.setRPM(leftRPM);
+  UART1.setRPM(rightRPM,101);
+  UART2.setRPM(rightRPM,101);
+  Serial.print("Left RPM set to: "); Serial.println(leftRPM);
+}
 
-  // Set the calculated speeds to the ESCs through the VESC UART interface
-  UART1.nunchuck.valueY = leftSpeed;  // Apply left speed adjustment
-  //UART2.nunchuck.valueY = rightSpeed; // Apply right speed adjustment
+void applyControlDuty(float dutyCycle) {
+  // Apply duty cycle control to motors
+  int leftDutyCycle = constrain(dutyCycle + (0.05 * currentTurn), 0, 80)
+  int rightDutyCycle = constrain(rpm - (0.05 * currentTurn), 0, 80)
+  UART1.setDuty(leftDutyCycle);
+  UART2.setDuty(leftDutyCycle);
+  UART1.setDuty(rightDutyCycle, 101);
+  UART2.setDuty(rightDutyCycle, 101);
+  Serial.print("Left Duty Cycle set to: "); Serial.println(leftDutyCycle);
+}
 
-  // Send the updated values to the ESCs to control the motors
-  //UART1.setNunchuckValues();
-  //UART2.setNunchuckValues();
-
-  Serial.print("Setting RPM to ");
-  Serial.println(speed);
-  UART1.setRPM(speed,0);
-  UART1.setRPM(speed,101);
+void applyControlCurrent(float current) {
+  // Apply current control to motors, adjustments for turning not demonstrated
+  int leftCurrent = constrain(dutyCycle + (0.025 * currentTurn), 0, 40)
+  int rightCurrent = constrain(rpm - (0.025 * currentTurn), 0, 40)
+  UART1.setCurrent(leftCurrent);
+  UART2.setCurrent(leftCurrent);
+  UART1.setCurrent(rightCurrent,101);
+  UART2.setCurrent(rightCurrent,101);
+  Serial.print("Current set to: "); Serial.println(current);
 }
 
 // Updates telemetry data from the ESCs, including battery voltage and motor RPM, and checks for low battery voltage.
@@ -185,29 +220,19 @@ void updateTelemetry()
   }
 }
 
-// Adjusts the speed adjustment factor to help the vehicle drive straight by correcting for differences in motor RPM.
-void adjustForStraightDrive() {
-  int rpmDifference = motorRPM1 - motorRPM2;
-  if (!targetTurn && abs(rpmDifference) > rpmDifferenceThreshold) {
-    speedAdjustment = rpmDifference / 100;
-  } else {
-    speedAdjustment = 0;
-  }
-}
-
 
 // Stops the motors by setting their speed values to neutral, used in cases of signal loss or as part of a shutdown procedure.
 void stopMotors()
 {
-  // Set motors to a neutral state (idle) to safely stop the vehicle
-  UART1.nunchuck.valueY = 127; // Neutral speed for left motor
-  UART2.nunchuck.valueY = 127; // Neutral speed for right motor
-
-  // Send the neutral speed values to the ESCs to stop the motors
-  UART1.setNunchuckValues();
-  UART2.setNunchuckValues();
-
-  Serial.println("Motors stopped due to signal loss."); // Log message indicating motors have been stopped
+  UART1.setBrakeCurrent(5);
+  UART1.setBrakeCurrent(5,101);
+  UART1.setCurrent(0);
+  UART1.setCurrent(0,101);
+  UART2.setBrakeCurrent(5);
+  UART2.setBrakeCurrent(5,101);
+  UART2.setCurrent(0);
+  UART2.setCurrent(0,101);
+  Serial.println("Braking!");
 }
 
 void serialInput(){
@@ -234,39 +259,39 @@ if (Serial.available() > 0) {
 }
 
 void printChannelValues(){
-  // Serial.print("Channel 0: ");
-  // Serial.println(IBus.readChannel(0));
+  Serial.print("Channel 0: ");
+  Serial.println(IBus.readChannel(0));
 
-  // Serial.print("Channel 1: ");
-  // Serial.println(IBus.readChannel(1));
+  Serial.print("Channel 1: ");
+  Serial.println(IBus.readChannel(1));
   
-  // Serial.print("Channel 2: ");
-  // Serial.println(IBus.readChannel(2));
+  Serial.print("Channel 2: ");
+  Serial.println(IBus.readChannel(2));
   
-  // Serial.print("Channel 3: ");
-  // Serial.println(IBus.readChannel(3));
+  Serial.print("Channel 3: ");
+  Serial.println(IBus.readChannel(3));
   
-  // Serial.print("Channel 4: ");
-  // Serial.println(IBus.readChannel(4));
+  Serial.print("Channel 4: ");
+  Serial.println(IBus.readChannel(4));
   
-  // Serial.print("Channel 5: ");
-  // Serial.println(IBus.readChannel(5));
+  Serial.print("Channel 5: ");
+  Serial.println(IBus.readChannel(5));
   
-  // Serial.print("Channel 6: ");
-  // Serial.println(IBus.readChannel(6));
+  Serial.print("Channel 6: ");
+  Serial.println(IBus.readChannel(6));
   
-  // Serial.print("Channel 7: ");
-  // Serial.println(IBus.readChannel(7));
+  Serial.print("Channel 7: ");
+  Serial.println(IBus.readChannel(7));
   
-  // Serial.print("Channel 8: ");
-  // Serial.println(IBus.readChannel(8));
+  Serial.print("Channel 8: ");
+  Serial.println(IBus.readChannel(8));
   
-  // Serial.print("Channel 9: ");
-  // Serial.println(IBus.readChannel(9));
+  Serial.print("Channel 9: ");
+  Serial.println(IBus.readChannel(9));
 
   // Serial.print("IBus Count: ");
   // Serial.println(IBus.cnt_rec);
 
-  // Serial.println();
+  Serial.println();
 }
 
