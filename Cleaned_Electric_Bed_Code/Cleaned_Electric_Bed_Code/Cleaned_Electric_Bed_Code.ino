@@ -76,6 +76,13 @@ Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 MPU6050 accelgyro;
 const int quickTurnThreshold = 100; // Example threshold, adjust based on testing
 
+// Digipot control pins
+const int pinUD = 10; // Up/Down pin
+const int pinINC = 11; // Increment pin
+const int pinCS = 12; // Chip Select pin
+
+int currentWiperPosition = 0; // Current wiper position, starting at 0 (minimum)
+
 // Setup function initializes the serial communication ports and prepares the system for operation.
 void setup() {
     initializeSerial();
@@ -147,6 +154,34 @@ void initializeI2CDevices() {
     Serial.println("Initializing I2C devices...");
     accelgyro.initialize();
     Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
+}
+
+void setupDigipot() {
+  pinMode(pinUD, OUTPUT);
+  pinMode(pinINC, OUTPUT);
+  pinMode(pinCS, OUTPUT);
+
+  digitalWrite(pinCS, HIGH); // Deselect the device by default
+
+  resetDigipotToMinimum();
+}
+
+void resetDigipotToMinimum() {
+    // Select the digipot
+    digitalWrite(pinCS, LOW);
+
+    // Set to decrease wiper position
+    digitalWrite(pinUD, LOW);
+    for (int i = 0; i < 100; i++) { // Assuming 100 steps for the digipot
+        // Pulse the INC pin
+        digitalWrite(pinINC, HIGH);
+        delay(1); // Short delay for the signal to register
+        digitalWrite(pinINC, LOW);
+        delay(1);
+    }
+
+    // Deselect the digipot
+    digitalWrite(pinCS, HIGH);
 }
 
 void processControlInputs() {
@@ -519,6 +554,53 @@ void fillStrip(uint8_t red, uint8_t green, uint8_t blue) {
   }
   strip.show();
 }
+
+void adjustVolume(int desiredLevel) {
+  if (desiredLevel < 0) desiredLevel = 0;
+  if (desiredLevel > 99) desiredLevel = 99; // Ensure desired level is within bounds (0-99 for X9C104)
+
+  // Select the digipot
+  digitalWrite(pinCS, LOW);
+
+  if (currentWiperPosition < desiredLevel) {
+    digitalWrite(pinUD, HIGH); // Set direction to increase wiper position
+    for (int i = currentWiperPosition; i < desiredLevel; i++) {
+      // Increment the potentiometer to the desired level
+      digitalWrite(pinINC, HIGH);
+      delay(1); // Short delay for the signal to register
+      digitalWrite(pinINC, LOW);
+      delay(1);
+    }
+  } else if (currentWiperPosition > desiredLevel) {
+    digitalWrite(pinUD, LOW); // Set direction to decrease wiper position
+    for (int i = currentWiperPosition; i > desiredLevel; i--) {
+      // Decrement the potentiometer to the desired level
+      digitalWrite(pinINC, HIGH);
+      delay(1); // Short delay for the signal to register
+      digitalWrite(pinINC, LOW);
+      delay(1);
+    }
+  }
+
+  // Update the current wiper position
+  currentWiperPosition = desiredLevel;
+
+  // Deselect the digipot
+  digitalWrite(pinCS, HIGH);
+}
+
+void controlVolumeAndMute() {
+  int lpotValue = IBus.readChannel(LPot);
+  if (lpotValue == 1000) {
+    turnOffRelay(relay7); // Mute
+  } else {
+    turnOnRelay(relay7); // Unmute
+    // Map the lpotValue (1000-2000) to a desired volume level (e.g., 0-100)
+    int volumeLevel = map(lpotValue, 1001, 2000, 0, 100);
+    adjustVolume(volumeLevel); // Adjust the volume according to the mapped value
+  }
+}
+
 
 void printChannelValues(){
   Serial.print("Channel 0: ");

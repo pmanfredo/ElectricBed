@@ -14,7 +14,7 @@ The ElectricBed project transforms the concept of mobility and rest into a singl
 - Telemetry feedback for battery monitoring and RPM-based adjustments, ensuring safe and efficient operation.
 - Customizable LED lighting for aesthetic appeal and visibility.
 - Motion detection for improved stability and traction control, enhancing passenger comfort.
-- Auxiliary controls via relays for headlights, parking lights, turn signals, horn, and reverse light.
+- Auxiliary controls via relays for headlights, parking lights, turn signals, horn, reverse light, and volume control.
 - Comprehensive safety features such as an emergency stop mechanism and a 2-step kill switch.
 
 ### Required Hardware
@@ -22,6 +22,7 @@ The ElectricBed project transforms the concept of mobility and rest into a singl
 - Arduino Mega 2560 for central control.
 - Two Electronic Speed Controllers (ESCs) for motor management.
 - FlySky FS-i6X remote control transmitter and receiver for remote operation.
+- HiLetgo X9C104 Digital Potentiometer Module for volume control.
 - Adafruit NeoPixel LED Strip for customizable lighting.
 - MPU6050 Accelerometer and Gyro Sensor for motion detection and stability control.
 - Relay module(s) for controlling auxiliary features like headlights, parking lights, turn signals, horn, and reverse light.
@@ -33,17 +34,24 @@ The ElectricBed project transforms the concept of mobility and rest into a singl
 2. **iBus Receiver**: Connect to `Serial3` (TX3/RX3) on the Arduino to receive input from the FlySky transmitter.
 3. **LED Strip**: Attach to pin `6` on the Arduino for lighting effects.
 4. **MPU6050 Sensor**: Use the Arduino's I2C ports (SDA and SCL) for connection.
-5. **Relay Modules**: Use digital pins `2` through `9` for auxiliary controls such as headlights, parking lights, turn signals, horn, and reverse light, enhancing the functionality and safety of your mobile bed.
-6. **Power Connections**: Ensure all components are appropriately powered according to their specifications.
+5. **Digital Potentiometer**: Connect the U/D, INC, and CS pins of the X9C104 to digital pins `10`, `11`, and `12` respectively on the Arduino.
+6. **Relay Modules**: Use digital pins `2` through `9` for auxiliary controls such as headlights, parking lights, turn signals, horn, reverse light, and to enable/disable volume, enhancing the functionality and safety of your mobile bed.
+7. **Power Connections**: Ensure all components are appropriately powered according to their specifications.
 
 ### Program Overview
 
 The provided code orchestrates various functions:
 
-- Initialization of serial ports, ESCs, iBus receiver, relays, LED strip, and I2C devices in the `setup()`.
-- Continuous monitoring and processing of control inputs, telemetry data, and safety checks in the `loop()`.
+- Initialization of serial ports, ESCs, iBus receiver, relays, LED strip, digital potentiometer, and I2C devices in the `setup()`.
+- Continuous monitoring and processing of control inputs, telemetry data, safety checks, and volume adjustments in the `loop()`.
 - Customizable control modes (RPM, Duty, Current) for varying operational preferences.
 - Relay control for auxiliary functions and LED color customization for personalization and visibility.
+
+### Volume Control Setup
+
+- At startup, the digital potentiometer is reset to its minimum value to establish a reference point.
+- Volume adjustments are made relative to this reference point, allowing for precise control over the audio output level.
+- The current position of the digital potentiometer's wiper is tracked to facilitate efficient and accurate adjustments.
 
 ### Getting Started
 
@@ -61,7 +69,7 @@ Enjoy building and operating your ElectricBed, a unique blend of technology, com
 
 ## Upcoming Features
 
-We're continuously working to enhance the ElectricBed experience with innovative features and improvements. Here are some of the exciting updates you can look forward to:
+We're continuously working to enhance the ElectricBed experience with innovative features and improvements. Here are some of the exciting updates you can look forward to as we get them completed:
 
 ### Sound System with Remote Volume Control
 
