@@ -56,6 +56,12 @@ const int relay6 = 7;
 const int relay7 = 8;
 const int relay8 = 9;
 
+// For tracking left joystick x-axis double-tap
+unsigned long leftJoystickFirstHitTime = 0;
+const unsigned long doubleTapMaxInterval = 500; // Max interval in ms for double-tap detection
+bool leftJoystickInRangeLastTime = false;
+int leftJoystickHitCount = 0;
+
 // Define the pin that the LED strip is connected to
 #define LED_PIN 6
 
@@ -143,6 +149,7 @@ void initializeI2CDevices() {
 
 void processControlInputs() {
   readInputs();
+  checkTurnSignals();
 
   // Applies smooth adjustments to speed and turn to avoid abrupt changes
   smoothAdjustments();
@@ -175,6 +182,46 @@ void processControlInputs() {
           applyControlCurrent(current);
           break;
   }
+}
+
+void checkTurnSignals(){
+  // Handling Left Joystick X-Axis for Turn Signals
+  int leftJoystickX = IBus.readChannel(LJoyX);
+  unsigned long currentMillis = millis();
+
+  // Reset hit count if interval exceeds max double-tap interval
+  if (currentMillis - leftJoystickFirstHitTime > doubleTapMaxInterval && leftJoystickHitCount > 0) {
+      leftJoystickHitCount = 0;
+  }
+
+  if ((leftJoystickX >= 1000 && leftJoystickX <= 1100) || (leftJoystickX >= 1900 && leftJoystickX <= 2000)) {
+    if (!leftJoystickInRangeLastTime) {
+        leftJoystickInRangeLastTime = true;
+        leftJoystickHitCount++;
+        leftJoystickFirstHitTime = currentMillis;
+
+        // If first hit, deactivate both relays
+        if (leftJoystickHitCount == 1) {
+            turnOffRelay(relay2); // Turn off Relay 2
+            turnOffRelay(relay3); // Turn off Relay 3
+        }
+
+        // If second hit and within interval, activate the appropriate relay and ensure the other is off
+        if (leftJoystickHitCount == 2) {
+            if (leftJoystickX >= 1000 && leftJoystickX <= 1100) {
+                turnOffRelay(relay3); // Ensure Relay 3 is off
+                turnOnRelay(relay2); // Turn on Relay 2 for left turn signal
+            } else if (leftJoystickX >= 1900 && leftJoystickX <= 2000) {
+                turnOffRelay(relay2); // Ensure Relay 2 is off
+                turnOnRelay(relay3); // Turn on Relay 3 for right turn signal
+            }
+            leftJoystickHitCount = 0; // Reset count after activation
+        }
+    }
+  } else {
+      leftJoystickInRangeLastTime = false;
+    }
+
 }
 
 // Reads inputs from the remote control receiver and maps them to target speed and turn values.
