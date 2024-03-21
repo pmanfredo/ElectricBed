@@ -62,6 +62,8 @@ const unsigned long doubleTapMaxInterval = 500; // Max interval in ms for double
 bool leftJoystickInRangeLastTime = false;
 int leftJoystickHitCount = 0;
 
+const unsigned long hornDuration = 500; // Duration of the horn beep in milliseconds
+
 // Define the pin that the LED strip is connected to
 #define LED_PIN 6
 
@@ -151,6 +153,8 @@ void processControlInputs() {
   readInputs();
   checkTurnSignals();
   checkHornControl();
+  checkHeadlights();
+  checkHazardLights();
 
   // Applies smooth adjustments to speed and turn to avoid abrupt changes
   smoothAdjustments();
@@ -203,18 +207,18 @@ void checkTurnSignals(){
 
         // If first hit, deactivate both relays
         if (leftJoystickHitCount == 1) {
-            turnOffRelay(relay2); // Turn off Relay 2
-            turnOffRelay(relay3); // Turn off Relay 3
+            turnOffRelay(relay1); // Turn off Relay 2
+            turnOffRelay(relay2); // Turn off Relay 3
         }
 
         // If second hit and within interval, activate the appropriate relay and ensure the other is off
         if (leftJoystickHitCount == 2) {
             if (leftJoystickX >= 1000 && leftJoystickX <= 1100) {
-                turnOffRelay(relay3); // Ensure Relay 3 is off
-                turnOnRelay(relay2); // Turn on Relay 2 for left turn signal
+                turnOffRelay(relay2); // Ensure Relay 3 is off
+                turnOnRelay(relay1); // Turn on Relay 2 for left turn signal
             } else if (leftJoystickX >= 1900 && leftJoystickX <= 2000) {
-                turnOffRelay(relay2); // Ensure Relay 2 is off
-                turnOnRelay(relay3); // Turn on Relay 3 for right turn signal
+                turnOffRelay(relay1); // Ensure Relay 2 is off
+                turnOnRelay(relay2); // Turn on Relay 3 for right turn signal
             }
             leftJoystickHitCount = 0; // Reset count after activation
         }
@@ -231,16 +235,16 @@ void checkHornControl() {
     int rightJoystickY = IBus.readChannel(RJoyY); // Reading the Y-axis of the right joystick
 
     if (rightJoystickY >= 1900 && rightJoystickY <= 2000) {
-        turnOnRelay(relay4); // Continuous horn - Joystick pushed upwards
+        turnOnRelay(relay3); // Continuous horn - Joystick pushed upwards
         hornBeeped = false; // Reset beeped flag for next operation
     } else if (rightJoystickY >= 1000 && rightJoystickY <= 1100 && !hornBeeped) {
         // Short beep - Joystick pushed downwards
         if (hornStartTime == 0) { // If the beep hasn't started yet
-            turnOnRelay(relay4); // Turn on relay4 for the horn
+            turnOnRelay(relay3); // Turn on relay4 for the horn
             hornStartTime = millis(); // Mark the start time of the beep
         }
         if (millis() - hornStartTime > hornDuration) { // If the beep duration has passed
-            turnOffRelay(relay4); // Turn off relay4 after the short beep duration
+            turnOffRelay(relay3); // Turn off relay4 after the short beep duration
             hornBeeped = true; // Set flag to true to avoid repeating the beep
             hornStartTime = 0; // Reset start time for next beep
         }
@@ -248,10 +252,39 @@ void checkHornControl() {
         // Resets the horn beeped flag when the joystick is neither fully up nor down
         hornBeeped = false;
         hornStartTime = 0; // Reset start time for next beep
-        turnOffRelay(relay4); // Ensure the relay is off when not in the beep or continuous horn zones
+        turnOffRelay(relay3); // Ensure the relay is off when not in the beep or continuous horn zones
     }
 }
 
+void checkHeadlights() {
+    int swcValue = IBus.readChannel(SWC); // Reading the value of the SWC switch
+
+    if (swcValue == OFF) {
+        // If SWC is 1000, both relay5 and relay6 are off
+        turnOffRelay(relay4);
+        turnOffRelay(relay5);
+    } else if (swcValue == MID) {
+        // If SWC is 1500, relay5 is on and relay6 is off
+        turnOnRelay(relay4);
+        turnOffRelay(relay5);
+    } else if (swcValue == ON) {
+        // If SWC is 2000, both relay5 and relay6 are on
+        turnOnRelay(relay4);
+        turnOnRelay(relay5);
+    }
+}
+
+void checkHazardLights() {
+    int swdValue = IBus.readChannel(SWD); // Reading the value of the SWD switch
+
+    if (swdValue == OFF) {
+        // If SWD is 1000, relay7 is off
+        turnOffRelay(relay6);
+    } else if (swdValue == OFF) {
+        // If SWD is 2000, relay7 is on
+        turnOnRelay(relay6);
+    }
+}
 
 // Reads inputs from the remote control receiver and maps them to target speed and turn values.
 void readInputs()
@@ -312,17 +345,8 @@ void readInputs()
     delay(100); // Brief delay to reduce CPU load during loop
   }
 
-  int swdState = IBus.readChannel(SWD); // Read the SWD channel state
-
-  if (swdState >= ON) { // Assuming 2000 or above is considered ON
-      turnOnRelay(relay1); // Turn ON relay1
-  } else if (swdState <= OFF) { // Assuming 1000 or below is considered OFF
-      turnOffRelay(relay1); // Turn OFF relay1
-  }
-
   targetSpeed = IBus.readChannel(LJoyY); // Reads the speed input from Left Joystick Y Axis of the receiver
 
-  // Checks if the SWA input is above 1000 (typically the threshold for forward/reverse switch)
   if (IBus.readChannel(SWB) == OFF)
   {
     // If true, maps the speed value for reverse direction
