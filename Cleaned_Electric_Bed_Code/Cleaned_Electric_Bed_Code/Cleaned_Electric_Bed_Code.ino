@@ -478,7 +478,7 @@ void stopMotors()
 }
 
 void serialInput(){
-if (Serial.available() > 0) {
+  if (Serial.available() > 0) {
     // Read the incoming data as a string until newline is encountered
     String dataString = Serial.readStringUntil('\n');
     // Convert the string to an integer
