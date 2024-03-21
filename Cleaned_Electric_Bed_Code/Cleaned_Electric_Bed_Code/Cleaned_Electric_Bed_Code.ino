@@ -84,7 +84,7 @@ const int pinCS = 12; // Chip Select pin
 int currentWiperPosition = 0; // Current wiper position, starting at 0 (minimum)
 
 // Setup function initializes the serial communication ports and prepares the system for operation.
-void setup() {
+void setup(){
     initializeSerial();
     setupESCs();
     IBus.begin(Serial3);
@@ -95,10 +95,9 @@ void setup() {
 }
 
 // Main loop function checks for signal loss and processes control inputs if signal is present.
-void loop()
-{
-  serialInput();
-  printChannelValues();
+void loop(){
+  //serialInput();
+  //printChannelValues();
   if (IBus.cnt_rec != lastCntRec)
   {                            // Checks if new iBus messages have been received since the last loop iteration.
     updateTelemetry();         // Updates telemetry data from the ESCs for features like battery monitoring.
@@ -110,8 +109,7 @@ void loop()
 }
 
 // Function to initialize the ESCs (Electronic Speed Controllers) by setting their respective serial ports.
-void setupESCs()
-{
+void setupESCs(){
   Serial.println("Initializing ESCs..."); // Log message indicating the start of ESC initialization
   UART1.setSerialPort(&Serial1);          // Assigns Serial1 to UART1, linking the ESC to the first serial port
   UART2.setSerialPort(&Serial2);          // Assigns Serial2 to UART2, linking the second ESC to another serial port
@@ -119,8 +117,7 @@ void setupESCs()
 }
 
 // Function to wait for the receiver to start sending data. This ensures the program doesn't proceed without a signal.
-void waitForReceiver()
-{
+void waitForReceiver(){
   Serial.println("Waiting for receiver..."); // Log message indicating the program is waiting for receiver data
   while (IBus.cnt_rec == 0)
     delay(100);                          // Waits in a loop, delaying 100ms at a time until data is received from the receiver
@@ -190,6 +187,8 @@ void processControlInputs() {
   checkHornControl();
   checkHeadlights();
   checkHazardLights();
+  controlVolumeAndMute();
+  controlLEDScenes();
 
   // Applies smooth adjustments to speed and turn to avoid abrupt changes
   smoothAdjustments();
@@ -322,8 +321,7 @@ void checkHazardLights() {
 }
 
 // Reads inputs from the remote control receiver and maps them to target speed and turn values.
-void readInputs()
-{
+void readInputs(){
     // Step 1: Ensure all switches are OFF before proceeding
   while (true) {
     int swaState = IBus.readChannel(SWA);
@@ -402,8 +400,7 @@ void readInputs()
 }
 
 // Applies smooth adjustments to the current speed and turn values to reach the target values without abrupt changes.
-void smoothAdjustments()
-{
+void smoothAdjustments(){
   checkAndAdjustForQuickTurns();
 
   // Adjusts the current speed towards the target speed at a controlled rate (accelRate)
@@ -471,8 +468,7 @@ void applyControlCurrent(float current) {
 }
 
 // Updates telemetry data from the ESCs, including battery voltage and motor RPM, and checks for low battery voltage.
-void updateTelemetry()
-{
+void updateTelemetry(){
   // Retrieve and store telemetry data for each ESC
   if (UART1.getVescValues())
   {
@@ -499,8 +495,7 @@ void updateTelemetry()
 }
 
 // Stops the motors by setting their speed values to neutral, used in cases of signal loss or as part of a shutdown procedure.
-void stopMotors()
-{
+void stopMotors(){
   UART1.setBrakeCurrent(5);
   UART1.setBrakeCurrent(5,101);
   UART1.setCurrent(0);
@@ -601,6 +596,47 @@ void controlVolumeAndMute() {
   }
 }
 
+void ledScene1() {
+    // Placeholder for LED Scene 1
+    // Example: strip.fill(strip.Color(255, 0, 0), 0, LED_COUNT); // Fill with red
+    // strip.show();
+}
+
+void ledScene2() {
+    // Placeholder for LED Scene 2
+}
+
+void ledScene3() {
+    // Placeholder for LED Scene 3
+}
+
+void ledScene4() {
+    // Placeholder for LED Scene 4
+}
+
+void ledScene5() {
+    // Placeholder for LED Scene 5
+}
+
+void controlLEDScenes() {
+    int rPotValue = IBus.readChannel(RPot); // Reading the value of RPot
+
+    if (rPotValue <= 1000) {
+        // LED off
+        strip.clear();
+        strip.show();
+    } else if (rPotValue > 1000 && rPotValue <= 1200) {
+        ledScene1(); // Activate LED Scene 1
+    } else if (rPotValue > 1200 && rPotValue <= 1400) {
+        ledScene2(); // Activate LED Scene 2
+    } else if (rPotValue > 1400 && rPotValue <= 1600) {
+        ledScene3(); // Activate LED Scene 3
+    } else if (rPotValue > 1600 && rPotValue <= 1800) {
+        ledScene4(); // Activate LED Scene 4
+    } else if (rPotValue > 1800 && rPotValue <= 2000) {
+        ledScene5(); // Activate LED Scene 5
+    }
+}
 
 void printChannelValues(){
   Serial.print("Channel 0: ");
