@@ -150,6 +150,7 @@ void initializeI2CDevices() {
 void processControlInputs() {
   readInputs();
   checkTurnSignals();
+  checkHornControl();
 
   // Applies smooth adjustments to speed and turn to avoid abrupt changes
   smoothAdjustments();
@@ -223,6 +224,34 @@ void checkTurnSignals(){
     }
 
 }
+
+void checkHornControl() {
+    static bool hornBeeped = false; // Tracks if a short beep was already made
+    static unsigned long hornStartTime = 0; // Tracks when the horn beep started
+    int rightJoystickY = IBus.readChannel(RJoyY); // Reading the Y-axis of the right joystick
+
+    if (rightJoystickY >= 1900 && rightJoystickY <= 2000) {
+        turnOnRelay(relay4); // Continuous horn - Joystick pushed upwards
+        hornBeeped = false; // Reset beeped flag for next operation
+    } else if (rightJoystickY >= 1000 && rightJoystickY <= 1100 && !hornBeeped) {
+        // Short beep - Joystick pushed downwards
+        if (hornStartTime == 0) { // If the beep hasn't started yet
+            turnOnRelay(relay4); // Turn on relay4 for the horn
+            hornStartTime = millis(); // Mark the start time of the beep
+        }
+        if (millis() - hornStartTime > hornDuration) { // If the beep duration has passed
+            turnOffRelay(relay4); // Turn off relay4 after the short beep duration
+            hornBeeped = true; // Set flag to true to avoid repeating the beep
+            hornStartTime = 0; // Reset start time for next beep
+        }
+    } else if (rightJoystickY > 1100 && rightJoystickY < 1900) {
+        // Resets the horn beeped flag when the joystick is neither fully up nor down
+        hornBeeped = false;
+        hornStartTime = 0; // Reset start time for next beep
+        turnOffRelay(relay4); // Ensure the relay is off when not in the beep or continuous horn zones
+    }
+}
+
 
 // Reads inputs from the remote control receiver and maps them to target speed and turn values.
 void readInputs()
