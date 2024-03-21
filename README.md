@@ -58,3 +58,23 @@ The provided code orchestrates various functions:
 Customize acceleration rates, turn sensitivity, LED behavior, and more to enhance the driving experience and ensure passenger comfort. Prioritize safety by securely fastening all components and conducting thorough testing before use.
 
 Enjoy building and operating your ElectricBed, a unique blend of technology, comfort, and mobility!
+
+## Upcoming Features
+
+We're continuously working to enhance the ElectricBed experience with innovative features and improvements. Here are some of the exciting updates you can look forward to:
+
+### Sound System with Remote Volume Control
+
+Enjoy an immersive audio experience with a fully integrated sound system. Future updates will include the ability to control the volume directly from your FlySky FS-i6X remote, allowing for seamless adjustments without the need to stop or reach for a separate controller. Whether you're looking to set the mood with some background music or amp up the energy with your favorite tracks, having control at your fingertips will enhance your ElectricBed experience.
+
+### Electric Bed App for Monitoring and Security Enhancements
+
+Stay connected with your ElectricBed through our upcoming dedicated app. This application will not only allow you to monitor key vehicle metrics in real-time, such as battery levels, speed, and system diagnostics, but it will also introduce new layers of security and convenience:
+
+- **Remote Monitoring**: Check on your ElectricBed's status, ensuring it's always ready for your next adventure.
+- **Security Alerts**: Receive instant notifications for unauthorized movements or tampering, offering peace of mind when you're away from your *vehicle when it is on*.
+- **Future Updates**: The app will serve as a platform for rolling out future features and enhancements, keeping your ElectricBed at the cutting edge of technology.
+
+Stay tuned for these updates and more as we continue to innovate and expand the capabilities of the ElectricBed project. 
+
+**If you have any features you would like to see added, please make a pull request or add to our discussion!**
