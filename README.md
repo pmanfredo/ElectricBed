@@ -35,8 +35,24 @@ The ElectricBed project transforms the concept of mobility and rest into a singl
 3. **LED Strip**: Attach to pin `6` on the Arduino for lighting effects.
 4. **MPU6050 Sensor**: Use the Arduino's I2C ports (SDA and SCL) for connection.
 5. **Digital Potentiometer**: Connect the U/D, INC, and CS pins of the X9C104 to digital pins `10`, `11`, and `12` respectively on the Arduino.
-6. **Relay Modules**: Use digital pins `2` through `9` for auxiliary controls such as headlights, parking lights, turn signals, horn, reverse light, and to enable/disable volume, enhancing the functionality and safety of your mobile bed.
 7. **Power Connections**: Ensure all components are appropriately powered according to their specifications.
+
+## Relay Wiring Instructions
+
+The project utilizes a series of relays to control various components such as turn signals, headlights, horn, and more. Below are the detailed wiring instructions for each relay connected to the Arduino:
+
+- **Relays**: The project uses relays for controlling different functionalities. Each relay is controlled by a specific digital pin on the Arduino Mega 2560.
+
+### Relay Connections
+
+- **Relay 1 (Headlights)**: Connect to digital pin 2.
+- **Relay 2 (Parking Lights)**: Connect to digital pin 3.
+- **Relay 3 (Horn)**: Connect to digital pin 4.
+- **Relay 4 (Turn Signals - Left)**: Connect to digital pin 5.
+- **Relay 5 (Turn Signals - Right)**: Connect to digital pin 6.
+- **Relay 6 (Reverse Light)**: Connect to digital pin 7.
+- **Relay 7 (Volume Control/Mute for Sound System)**: Connect to digital pin 8.
+- **Relay 8 (LED Scene Control)**: Connect to digital pin 9.
 
 ### Program Overview
 
