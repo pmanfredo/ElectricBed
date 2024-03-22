@@ -17,14 +17,11 @@ uint16_t lastCntRec = 0;                  // Last received count for detecting s
 
 // Control variables
 int currentSpeed = 0, targetSpeed = 0, currentTurn = 0, targetTurn = 0;
-int accelRate = 100, turnRate = 5; // Rate of change for speed and turn
+int accelRate = 50, turnRate = 5; // Rate of change for speed and turn
 
 // Telemetry variables
 float batteryVoltage1 = 0.0, batteryVoltage2 = 0.0;
-int32_t motorRPM1 = 0, motorRPM2 = 0;
 const float voltageWarningThreshold = 33.0;  // Threshold for 10S battery
-const int32_t rpmDifferenceThreshold = 1000; // Threshold for RPM difference
-int speedAdjustment = 0;                     // For adjusting speed difference between two sets of motors
 
 bool movementEnabled = true; // Global variable to track movement enable state
 
@@ -42,9 +39,11 @@ ControlMode controlMode = MODE_RPM; // Choose control mode: MODE_RPM, MODE_DUTY,
 #define SWB 7
 #define SWC 8
 #define SWD 9
-#define ON 2000
-#define OFF 1000
+#define ON 1000
+#define OFF 2000
 #define MID 1500
+
+bool startup = true;
 
 // Define relay channels to Arduino pin numbers
 const int relay1 = 2;
@@ -68,7 +67,11 @@ const unsigned long hornDuration = 500; // Duration of the horn beep in millisec
 #define LED_PIN 6
 
 // Define the number of LEDs in the strip
-#define LED_COUNT 300
+#define LED_COUNT 600
+
+unsigned long previousMillis = 0; // will store last time LED was updated
+const long interval = 0; // interval at which to blink (milliseconds)
+unsigned int i = 0;
 
 // Create an Adafruit_NeoPixel object
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
@@ -89,9 +92,9 @@ void setup(){
     setupESCs();
     IBus.begin(Serial3);
     waitForReceiver();
-    initializeRelays();
+    //initializeRelays();
     initializeLEDStrip();
-    initializeI2CDevices();
+    //initializeI2CDevices();
 }
 
 // Main loop function checks for signal loss and processes control inputs if signal is present.
@@ -193,13 +196,14 @@ void processControlInputs() {
   // Applies smooth adjustments to speed and turn to avoid abrupt changes
   smoothAdjustments();
   
-  // Turn system OFF or set current to 0 if input is 1000
-  if (targetSpeed <= OFF) {
+  //Turn system OFF or set current to 0 if input is 1000
+  if (targetSpeed <= 1000) {
       UART1.setCurrent(0);
       UART1.setCurrent(0,101);
       UART2.setCurrent(0);
       UART2.setCurrent(0,101);
       Serial.println("System turned off - Current set to 0.");
+      currentSpeed = 1000;
       return;
   }
 
@@ -207,12 +211,12 @@ void processControlInputs() {
   switch (controlMode) {
       case MODE_RPM:
           // Map targetSpeed (1001-2000) to RPM range (0-7000), considering 1000 as OFF
-          int rpmValue = map(currentSpeed, 1001, 2000, 0, 7000);
+          int rpmValue = map(currentSpeed, 1001, 2000, 1000, 7000);
           applyControlRPM(rpmValue);
           break;
       case MODE_DUTY:
           // Map targetSpeed (1001-2000) to duty cycle range (0-80%)
-          float dutyCycle = map(targetSpeed, 1001, 2000, 0, 80) / 100.0;
+          float dutyCycle = map(targetSpeed, 1001, 2000, 0, 80);
           applyControlDuty(dutyCycle);
           break;
       case MODE_CURRENT:
@@ -323,13 +327,19 @@ void checkHazardLights() {
 // Reads inputs from the remote control receiver and maps them to target speed and turn values.
 void readInputs(){
     // Step 1: Ensure all switches are OFF before proceeding
-  while (true) {
+  while (startup) {
     int swaState = IBus.readChannel(SWA);
     int swbState = IBus.readChannel(SWB);
     int swcState = IBus.readChannel(SWC);
     int swdState = IBus.readChannel(SWD);
 
+    // Serial.println(swaState);
+    // Serial.println(swbState);
+    // Serial.println(swcState);
+    // Serial.println(swdState);
+
     if (swaState == OFF && swbState == OFF && swcState == OFF && swdState == OFF) {
+      startup = false;
       break; // Exit the loop if all switches are OFF
     }
 
@@ -349,7 +359,7 @@ void readInputs(){
       swbSafetyCheckPassed = false;
       stopMotors();
       movementEnabled = false;
-      currentSpeed = 0;
+      currentSpeed = 1000;
       Serial.println("Movement Disabled. Kill switch is OFF. SWB safety check reset.");
     }
 
@@ -395,8 +405,8 @@ void readInputs(){
 
   // Reads the turn input from Right Joystick X Axis and maps it to a target turn value
   targetTurn = (int)(IBus.readChannel(RJoyX) -1500); // 1000 (left) to 2000 (right), 1500 is neutral, turn -500 to 500
-  Serial.print("Target Turn: ");
-  Serial.println(targetTurn);
+  // Serial.print("Target Turn: ");
+  // Serial.println(targetTurn);
 }
 
 // Applies smooth adjustments to the current speed and turn values to reach the target values without abrupt changes.
@@ -414,6 +424,8 @@ void smoothAdjustments(){
     currentTurn += min(turnRate, targetTurn - currentTurn); // Increases turn rate if below target
   else if (currentTurn > targetTurn)
     currentTurn -= min(turnRate, currentTurn - targetTurn); // Decreases turn rate if above target
+
+  Serial.println(currentSpeed);
 }
 
 void checkAndAdjustForQuickTurns() {
@@ -434,6 +446,7 @@ void checkAndAdjustForQuickTurns() {
 }
 
 void applyControlRPM(int rpm) {
+  //Serial.print("Applying RPM");
   // Calculate left and right motor RPM based on target turn and speed adjustments
   int leftRPM = constrain(rpm + (2 * currentTurn), 0, 7000);
   int rightRPM = constrain(rpm - (2 * currentTurn), 0, 7000);
@@ -441,7 +454,7 @@ void applyControlRPM(int rpm) {
   UART2.setRPM(leftRPM);
   UART1.setRPM(rightRPM,101);
   UART2.setRPM(rightRPM,101);
-  Serial.print("Left RPM set to: "); Serial.println(leftRPM);
+  //Serial.print("Left RPM set to: "); Serial.println(leftRPM);
 }
 
 void applyControlDuty(float dutyCycle) {
@@ -473,7 +486,6 @@ void updateTelemetry(){
   if (UART1.getVescValues())
   {
     batteryVoltage1 = UART1.data.inpVoltage; // Store battery voltage from ESC 1
-    motorRPM1 = UART1.data.rpm;              // Store motor RPM from ESC 1
 
     // Serial.print("Battery Voltage: ");
     // Serial.println(batteryVoltage1);
@@ -481,7 +493,6 @@ void updateTelemetry(){
   if (UART2.getVescValues())
   {
     batteryVoltage2 = UART2.data.inpVoltage; // Store battery voltage from ESC 2
-    motorRPM2 = UART2.data.rpm;              // Store motor RPM from ESC 2
 
     // Serial.print("Battery Voltage: ");
     // Serial.println(batteryVoltage2);
@@ -498,12 +509,12 @@ void updateTelemetry(){
 void stopMotors(){
   UART1.setBrakeCurrent(5);
   UART1.setBrakeCurrent(5,101);
-  UART1.setCurrent(0);
-  UART1.setCurrent(0,101);
+  // UART1.setCurrent(0);
+  // UART1.setCurrent(0,101);
   UART2.setBrakeCurrent(5);
   UART2.setBrakeCurrent(5,101);
-  UART2.setCurrent(0);
-  UART2.setCurrent(0,101);
+  // UART2.setCurrent(0);
+  // UART2.setCurrent(0,101);
   Serial.println("Braking!");
 }
 
@@ -597,45 +608,75 @@ void controlVolumeAndMute() {
 }
 
 void ledScene1() {
-    // Placeholder for LED Scene 1
-    // Example: strip.fill(strip.Color(255, 0, 0), 0, LED_COUNT); // Fill with red
-    // strip.show();
+  // Placeholder for LED Scene 1
+  i = 0;
+  strip.fill(strip.Color(255, 0, 0), 0, LED_COUNT); // Fill with red
+  strip.show();
 }
 
 void ledScene2() {
-    // Placeholder for LED Scene 2
+  // Placeholder for LED Scene 2
+  i = 0;
+  strip.fill(strip.Color(0, 255, 0), 0, LED_COUNT); // Fill with red
+  strip.show();
 }
 
 void ledScene3() {
-    // Placeholder for LED Scene 3
+  // Placeholder for LED Scene 3
+  i = 0;
+  strip.fill(strip.Color(0, 0, 255), 0, LED_COUNT); // Fill with red
+  strip.show();
 }
 
 void ledScene4() {
-    // Placeholder for LED Scene 4
+  // Placeholder for LED Scene 4
+  // for(int i=0; i<strip.numPixels(); i++) { // For each pixel in strip...
+  //   strip.setPixelColor(i, strip.Color(255,   0,   0));         //  Set pixel's color (in RAM)
+  //   strip.show();                          //  Update strip to match
+  //   delay(50);                           //  Pause for a moment
+  // }
+
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - previousMillis >= interval) {
+    // save the last time you blinked the LED
+    previousMillis = currentMillis;
+
+    // if the LED is off turn it on and vice-versa:
+    strip.setPixelColor(i, strip.Color(255, 0, 0)); // Set pixel's color (in RAM)
+    strip.show(); // Update strip to match
+    i++;
+
+    // NOTE: This for loop will set the color for one LED and immediately proceed to the next iteration,
+    // which might not visually change all LEDs at once in a noticeable way. Adjust logic as needed for your visual effect.
+  }
 }
 
 void ledScene5() {
-    // Placeholder for LED Scene 5
+  // Placeholder for LED Scene 5
+  i = 0;
+  strip.fill(strip.Color(127, 127, 127), 0, LED_COUNT); // Fill with red
+  strip.show();
 }
 
 void controlLEDScenes() {
-    int rPotValue = IBus.readChannel(RPot); // Reading the value of RPot
+  int rPotValue = IBus.readChannel(RPot); // Reading the value of RPot
 
-    if (rPotValue <= 1000) {
-        // LED off
-        strip.clear();
-        strip.show();
-    } else if (rPotValue > 1000 && rPotValue <= 1200) {
-        ledScene1(); // Activate LED Scene 1
-    } else if (rPotValue > 1200 && rPotValue <= 1400) {
-        ledScene2(); // Activate LED Scene 2
-    } else if (rPotValue > 1400 && rPotValue <= 1600) {
-        ledScene3(); // Activate LED Scene 3
-    } else if (rPotValue > 1600 && rPotValue <= 1800) {
-        ledScene4(); // Activate LED Scene 4
-    } else if (rPotValue > 1800 && rPotValue <= 2000) {
-        ledScene5(); // Activate LED Scene 5
-    }
+  if (rPotValue <= 1000) {
+      // LED off
+      strip.clear();
+      strip.show();
+  } else if (rPotValue > 1000 && rPotValue <= 1200) {
+      ledScene1(); // Activate LED Scene 1
+  } else if (rPotValue > 1200 && rPotValue <= 1400) {
+      ledScene2(); // Activate LED Scene 2
+  } else if (rPotValue > 1400 && rPotValue <= 1600) {
+      ledScene3(); // Activate LED Scene 3
+  } else if (rPotValue > 1600 && rPotValue <= 1800) {
+      ledScene4(); // Activate LED Scene 4
+  } else if (rPotValue > 1800 && rPotValue <= 2000) {
+      ledScene5(); // Activate LED Scene 5
+  }
 }
 
 void printChannelValues(){
