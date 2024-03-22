@@ -17,7 +17,7 @@ uint16_t lastCntRec = 0;                  // Last received count for detecting s
 
 // Control variables
 int currentSpeed = 0, targetSpeed = 0, currentTurn = 0, targetTurn = 0;
-int accelRate = 50, turnRate = 5; // Rate of change for speed and turn
+int accelRate = 50, turnRate = 100; // Rate of change for speed and turn
 
 // Telemetry variables
 float batteryVoltage1 = 0.0, batteryVoltage2 = 0.0;
@@ -427,7 +427,7 @@ void smoothAdjustments(){
   else if (currentTurn > targetTurn)
     currentTurn -= min(turnRate, currentTurn - targetTurn); // Decreases turn rate if above target
 
-  Serial.println(currentSpeed);
+  //Serial.println(currentSpeed);
 }
 
 void checkAndAdjustForQuickTurns() {
@@ -456,7 +456,9 @@ void applyControlRPM(int rpm) {
   UART2.setRPM(leftRPM);
   UART1.setRPM(rightRPM,101);
   UART2.setRPM(rightRPM,101);
-  //Serial.print("Left RPM set to: "); Serial.println(leftRPM);
+  // Serial.print("Left RPM set to: "); Serial.println(leftRPM);
+  // Serial.print("Right RPM set to: "); Serial.println(rightRPM);
+  // delay(500);
 }
 
 void applyControlDuty(float dutyCycle) {
