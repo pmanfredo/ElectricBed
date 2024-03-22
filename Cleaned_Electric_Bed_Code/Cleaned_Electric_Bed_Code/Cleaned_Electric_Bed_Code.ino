@@ -24,6 +24,7 @@ float batteryVoltage1 = 0.0, batteryVoltage2 = 0.0;
 const float voltageWarningThreshold = 33.0;  // Threshold for 10S battery
 
 bool movementEnabled = true; // Global variable to track movement enable state
+bool reverse = false;
 
 enum ControlMode { MODE_RPM, MODE_DUTY, MODE_CURRENT };
 ControlMode controlMode = MODE_RPM; // Choose control mode: MODE_RPM, MODE_DUTY, or MODE_CURRENT
@@ -212,16 +213,25 @@ void processControlInputs() {
       case MODE_RPM:
           // Map targetSpeed (1001-2000) to RPM range (0-7000), considering 1000 as OFF
           int rpmValue = map(currentSpeed, 1001, 2000, 1000, 7000);
+          if(reverse){
+            rpmValue = -rpmValue;
+          }
           applyControlRPM(rpmValue);
           break;
       case MODE_DUTY:
           // Map targetSpeed (1001-2000) to duty cycle range (0-80%)
           float dutyCycle = map(targetSpeed, 1001, 2000, 0, 80);
+          if(reverse){
+            dutyCycle = -dutyCycle;
+          }
           applyControlDuty(dutyCycle);
           break;
       case MODE_CURRENT:
           // Map targetSpeed (1001-2000) to current range (0-40A)
           float current = map(targetSpeed, 1001, 2000, 0, 40);
+          if(reverse){
+            current = -current;
+          }
           applyControlCurrent(current);
           break;
   }
@@ -333,11 +343,6 @@ void readInputs(){
     int swcState = IBus.readChannel(SWC);
     int swdState = IBus.readChannel(SWD);
 
-    // Serial.println(swaState);
-    // Serial.println(swbState);
-    // Serial.println(swcState);
-    // Serial.println(swdState);
-
     if (swaState == OFF && swbState == OFF && swcState == OFF && swdState == OFF) {
       startup = false;
       break; // Exit the loop if all switches are OFF
@@ -390,23 +395,20 @@ void readInputs(){
 
   targetSpeed = IBus.readChannel(LJoyY); // Reads the speed input from Left Joystick Y Axis of the receiver
 
-  if (IBus.readChannel(SWB) == OFF)
+  int reverseValue = IBus.readChannel(SWB);
+
+  if (reverseValue == OFF && targetSpeed == 1000)
   {
     // If true, maps the speed value for reverse direction
-    targetSpeed = -targetSpeed;
-    Serial.print("Reverse Target Speed: ");
-    Serial.println(targetSpeed);
+    reverse = true;
   }
-  else
-  {
-    Serial.print("Target Speed: ");
-    Serial.println(targetSpeed);
+
+  if (reverseValue == ON && targetSpeed == 1000){
+    reverse = false;
   }
 
   // Reads the turn input from Right Joystick X Axis and maps it to a target turn value
   targetTurn = (int)(IBus.readChannel(RJoyX) -1500); // 1000 (left) to 2000 (right), 1500 is neutral, turn -500 to 500
-  // Serial.print("Target Turn: ");
-  // Serial.println(targetTurn);
 }
 
 // Applies smooth adjustments to the current speed and turn values to reach the target values without abrupt changes.
@@ -448,8 +450,8 @@ void checkAndAdjustForQuickTurns() {
 void applyControlRPM(int rpm) {
   //Serial.print("Applying RPM");
   // Calculate left and right motor RPM based on target turn and speed adjustments
-  int leftRPM = constrain(rpm + (2 * currentTurn), 0, 7000);
-  int rightRPM = constrain(rpm - (2 * currentTurn), 0, 7000);
+  int leftRPM = constrain(rpm + (2 * currentTurn), -7000, 7000);
+  int rightRPM = constrain(rpm - (2 * currentTurn), -7000, 7000);
   UART1.setRPM(leftRPM);
   UART2.setRPM(leftRPM);
   UART1.setRPM(rightRPM,101);
@@ -509,12 +511,8 @@ void updateTelemetry(){
 void stopMotors(){
   UART1.setBrakeCurrent(5);
   UART1.setBrakeCurrent(5,101);
-  // UART1.setCurrent(0);
-  // UART1.setCurrent(0,101);
   UART2.setBrakeCurrent(5);
   UART2.setBrakeCurrent(5,101);
-  // UART2.setCurrent(0);
-  // UART2.setCurrent(0,101);
   Serial.println("Braking!");
 }
 
