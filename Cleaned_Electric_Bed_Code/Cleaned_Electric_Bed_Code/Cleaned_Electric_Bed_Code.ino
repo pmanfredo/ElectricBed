@@ -45,6 +45,19 @@ ControlMode controlMode = MODE_RPM; // Choose control mode: MODE_RPM, MODE_DUTY,
 #define MID 1500
 
 bool startup = true;
+bool dangerousTemp = false;
+bool dangerousCurrent = false;
+bool dangerousDuty = false;
+
+// Temperature thresholds (degrees Celsius)
+const float MOSFET_SAFE_TEMP = 80.0; // Maximum safe temperature for the ESC's MOSFETs
+const float MOTOR_SAFE_TEMP = 80.0;  // Maximum safe temperature for the motor
+
+// Current limits (Amps)
+const float MOTOR_CURRENT_LIMIT = 50.0; // Maximum safe current for the motor
+
+// Duty cycle limit (percentage)
+const float DUTY_CYCLE_LIMIT = 95.0; // Maximum safe duty cycle percentage
 
 // Define relay channels to Arduino pin numbers
 const int relay1 = 2;
@@ -203,7 +216,7 @@ void processControlInputs() {
       UART1.setCurrent(0,101);
       UART2.setCurrent(0);
       UART2.setCurrent(0,101);
-      Serial.println("System turned off - Current set to 0.");
+      //Serial.println("System turned off - Current set to 0.");
       currentSpeed = 1000;
       return;
   }
@@ -213,6 +226,11 @@ void processControlInputs() {
       case MODE_RPM:
           // Map targetSpeed (1001-2000) to RPM range (0-7000), considering 1000 as OFF
           int rpmValue = map(currentSpeed, 1001, 2000, 1000, 7000);
+
+          if (dangerousTemp || dangerousCurrent || dangerousDuty){
+            rpmValue = rpmValue / 2;
+          }
+
           if(reverse){
             rpmValue = -rpmValue;
           }
@@ -221,6 +239,11 @@ void processControlInputs() {
       case MODE_DUTY:
           // Map targetSpeed (1001-2000) to duty cycle range (0-80%)
           float dutyCycle = map(targetSpeed, 1001, 2000, 0, 80);
+
+          if (dangerousTemp || dangerousCurrent || dangerousDuty){
+            dutyCycle = dutyCycle / 2;
+          }
+
           if(reverse){
             dutyCycle = -dutyCycle;
           }
@@ -229,6 +252,11 @@ void processControlInputs() {
       case MODE_CURRENT:
           // Map targetSpeed (1001-2000) to current range (0-40A)
           float current = map(targetSpeed, 1001, 2000, 0, 40);
+
+          if (dangerousTemp || dangerousCurrent || dangerousDuty){
+            current = current / 2;
+          }
+
           if(reverse){
             current = -current;
           }
@@ -506,6 +534,33 @@ void updateTelemetry(){
   if (batteryVoltage1 < voltageWarningThreshold || batteryVoltage2 < voltageWarningThreshold)
   {
     //Serial.println("Warning: Low Battery Voltage!"); // Print a low battery warning
+  }
+
+  checkSystemHealth();
+}
+
+void checkSystemHealth() {
+  if (UART1.data.tempMosfet > MOSFET_SAFE_TEMP || UART1.data.tempMotor > MOTOR_SAFE_TEMP || UART2.data.tempMosfet > MOSFET_SAFE_TEMP || UART2.data.tempMotor > MOTOR_SAFE_TEMP) {
+    Serial.println("High temperature detected. Reducing performance.");
+    dangerousTemp = true;
+  } else {
+    dangerousTemp  = false;
+  }
+
+  if (UART1.data.avgMotorCurrent > MOTOR_CURRENT_LIMIT || UART2.data.avgMotorCurrent > MOTOR_CURRENT_LIMIT) {
+    Serial.println("High motor current detected. Adjusting control.");
+    // Adjust control logic here
+    dangerousCurrent = true;
+  } else {
+    dangerousCurrent  = false;
+  }
+
+  if (UART1.data.dutyCycleNow > DUTY_CYCLE_LIMIT || UART2.data.dutyCycleNow > DUTY_CYCLE_LIMIT) {
+    Serial.println("High duty cycle detected. Adjusting control.");
+    // Reduce demanded RPM or switch control mode
+    dangerousDuty = true;
+  } else {
+    dangerousDuty  = false;
   }
 }
 
