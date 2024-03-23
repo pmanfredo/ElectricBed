@@ -664,52 +664,27 @@ void controlVolumeAndMute() {
 
 void ledScene1() {
   // Placeholder for LED Scene 1
-  i = 0;
   strip.fill(strip.Color(255, 0, 0), 0, LED_COUNT); // Fill with red
   strip.show();
 }
 
 void ledScene2() {
   // Placeholder for LED Scene 2
-  i = 0;
   strip.fill(strip.Color(0, 255, 0), 0, LED_COUNT); // Fill with red
   strip.show();
 }
 
 void ledScene3() {
   // Placeholder for LED Scene 3
-  i = 0;
   strip.fill(strip.Color(0, 0, 255), 0, LED_COUNT); // Fill with red
   strip.show();
 }
 
 void ledScene4() {
-  // Placeholder for LED Scene 4
-  // for(int i=0; i<strip.numPixels(); i++) { // For each pixel in strip...
-  //   strip.setPixelColor(i, strip.Color(255,   0,   0));         //  Set pixel's color (in RAM)
-  //   strip.show();                          //  Update strip to match
-  //   delay(50);                           //  Pause for a moment
-  // }
-
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - previousMillis >= interval) {
-    // save the last time you blinked the LED
-    previousMillis = currentMillis;
-
-    // if the LED is off turn it on and vice-versa:
-    strip.setPixelColor(i, strip.Color(255, 0, 0)); // Set pixel's color (in RAM)
-    strip.show(); // Update strip to match
-    i++;
-
-    // NOTE: This for loop will set the color for one LED and immediately proceed to the next iteration,
-    // which might not visually change all LEDs at once in a noticeable way. Adjust logic as needed for your visual effect.
-  }
 }
 
 void ledScene5() {
   // Placeholder for LED Scene 5
-  i = 0;
   strip.fill(strip.Color(127, 127, 127), 0, LED_COUNT); // Fill with red
   strip.show();
 }
